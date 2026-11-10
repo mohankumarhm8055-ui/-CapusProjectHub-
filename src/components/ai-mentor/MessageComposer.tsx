@@ -136,13 +136,17 @@ export const MessageComposer: React.FC<MessageComposerProps> = ({
     <div className="border-t border-slate-200/80 bg-white/95 backdrop-blur-md px-4 sm:px-6 lg:px-8 py-3.5 max-w-5xl mx-auto w-full">
       {/* Microphone Error Alert */}
       {micError && (
-        <div className="mb-2 p-2.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 text-xs flex items-center justify-between gap-2">
+        <div
+          role="alert"
+          className="mb-2 p-2.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 text-xs flex items-center justify-between gap-2"
+        >
           <div className="flex items-center gap-2">
             <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
             <span>{micError}</span>
           </div>
           <button
             type="button"
+            aria-label="Dismiss microphone alert"
             onClick={() => setMicError(null)}
             className="text-amber-600 hover:text-amber-800 p-1"
           >
@@ -229,13 +233,14 @@ export const MessageComposer: React.FC<MessageComposerProps> = ({
           value={text}
           onChange={(e) => setText(e.target.value)}
           onKeyDown={handleKeyDown}
+          aria-label="Message AI Project Mentor"
           placeholder={
             isListeningMic
               ? 'Listening to speech... your words will appear here in real time.'
-              : 'Ask your AI Mentor about architecture, viva preparation, algorithms, or project scope...'
+              : 'Ask your AI Mentor about project ideas, college comparisons, feature scope, or proposals...'
           }
           rows={1}
-          className="w-full px-4 pt-3 pb-2 text-xs sm:text-sm text-slate-800 placeholder:text-slate-400 resize-none focus:outline-none bg-transparent"
+          className="w-full px-4 pt-3 pb-2 text-xs sm:text-sm text-slate-800 placeholder:text-slate-500 resize-none focus:outline-none bg-transparent"
         />
 
         {/* Bottom Toolbar */}
@@ -244,8 +249,9 @@ export const MessageComposer: React.FC<MessageComposerProps> = ({
           <div className="flex items-center gap-1.5">
             <button
               type="button"
+              aria-label="Attach project abstract, diagram, or code file"
               onClick={() => fileInputRef.current?.click()}
-              className="p-2 rounded-xl text-slate-500 hover:text-[#6658FF] hover:bg-slate-100 transition-colors cursor-pointer"
+              className="p-2 rounded-xl text-slate-600 hover:text-[#6658FF] hover:bg-slate-100 transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6658FF]"
               title="Attach project abstract, diagram, or code file"
             >
               <Paperclip className="w-4 h-4" />
@@ -254,11 +260,12 @@ export const MessageComposer: React.FC<MessageComposerProps> = ({
             {/* Speech-to-Text Mic Button */}
             <button
               type="button"
+              aria-label={isListeningMic ? 'Stop speech recording' : 'Start speech to text microphone'}
               onClick={handleToggleMic}
-              className={`p-2 rounded-xl transition-all cursor-pointer ${
+              className={`p-2 rounded-xl transition-all cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6658FF] ${
                 isListeningMic
                   ? 'text-rose-600 bg-rose-50 ring-2 ring-rose-400'
-                  : 'text-slate-500 hover:text-[#6658FF] hover:bg-slate-100'
+                  : 'text-slate-600 hover:text-[#6658FF] hover:bg-slate-100'
               }`}
               title={isListeningMic ? 'Stop recording speech' : 'Speak your question (Speech-to-Text)'}
             >
@@ -294,8 +301,9 @@ export const MessageComposer: React.FC<MessageComposerProps> = ({
             {/* Real-Time Voice Mode Button */}
             <button
               type="button"
+              aria-label="Open Real-Time Voice Mode"
               onClick={onOpenVoiceMode}
-              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-semibold text-[#6658FF] bg-[#6658FF]/10 hover:bg-[#6658FF]/20 border border-[#6658FF]/20 transition-all cursor-pointer ml-1"
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-semibold text-[#6658FF] bg-[#6658FF]/10 hover:bg-[#6658FF]/20 border border-[#6658FF]/20 transition-all cursor-pointer ml-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6658FF]"
               title="Launch Real-Time Voice Intelligence Workspace"
             >
               <Headphones className="w-3.5 h-3.5" />
@@ -305,13 +313,17 @@ export const MessageComposer: React.FC<MessageComposerProps> = ({
 
           {/* Right tool: Send Button */}
           <div className="flex items-center gap-2">
+            <span className="hidden md:inline text-[10px] text-slate-500">
+              Enter to send • Shift+Enter for new line
+            </span>
             <button
               type="button"
+              aria-label="Send message to AI Mentor"
               onClick={handleSend}
               disabled={(!text.trim() && attachments.length === 0) || isGenerating}
-              className={`flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl font-bold text-xs text-white transition-all ${
+              className={`flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl font-bold text-xs text-white transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6658FF] ${
                 (!text.trim() && attachments.length === 0) || isGenerating
-                  ? 'bg-slate-300 cursor-not-allowed text-slate-500'
+                  ? 'bg-slate-300 cursor-not-allowed text-slate-600'
                   : 'bg-[#6658FF] hover:bg-[#5546FF] shadow-sm hover:shadow-md cursor-pointer active:scale-95'
               }`}
             >

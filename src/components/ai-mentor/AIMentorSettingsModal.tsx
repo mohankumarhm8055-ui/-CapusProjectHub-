@@ -10,7 +10,13 @@ import {
   Headphones,
   Globe,
 } from 'lucide-react'
-import type { MentorSettings, SpokenLanguage, AudioPlaybackSpeed } from '../../types/aiMentor'
+import type {
+  MentorSettings,
+  SpokenLanguage,
+  AudioPlaybackSpeed,
+  ExplanationLevel,
+  ExplanationStyle,
+} from '../../types/aiMentor'
 
 interface AIMentorSettingsModalProps {
   isOpen: boolean
@@ -140,6 +146,101 @@ export const AIMentorSettingsModal: React.FC<AIMentorSettingsModalProps> = ({
                   {lvl.label}
                 </button>
               ))}
+            </div>
+          </div>
+
+          {/* 2b. Student Learning Depth & Personalization (Optional) */}
+          <div className="p-3.5 rounded-xl bg-slate-950/60 border border-slate-800 space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="font-bold text-xs text-white">Learning Depth & Personalization</span>
+              <span className="text-[10px] text-slate-400">Optional</span>
+            </div>
+            <div className="grid grid-cols-3 gap-2">
+              {(
+                [
+                  { id: 'beginner', label: 'Beginner' },
+                  { id: 'intermediate', label: 'Intermediate' },
+                  { id: 'advanced', label: 'Advanced' },
+                ] as const
+              ).map((lvl) => (
+                <button
+                  key={lvl.id}
+                  type="button"
+                  onClick={() =>
+                    setLocalSettings({
+                      ...localSettings,
+                      explanationLevel: lvl.id as ExplanationLevel,
+                    })
+                  }
+                  className={`py-1.5 px-2.5 rounded-lg text-center border font-semibold transition-all cursor-pointer ${
+                    (localSettings.explanationLevel || 'intermediate') === lvl.id
+                      ? 'bg-[#6658FF]/20 border-[#6658FF] text-white'
+                      : 'bg-slate-900 border-slate-800 text-slate-400 hover:border-slate-700 hover:text-slate-200'
+                  }`}
+                >
+                  {lvl.label}
+                </button>
+              ))}
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+              <div>
+                <label className="block text-[10px] font-semibold text-slate-400 mb-1">
+                  Explanation Style
+                </label>
+                <select
+                  value={localSettings.explanationStyle || 'step_by_step'}
+                  onChange={(e) =>
+                    setLocalSettings({
+                      ...localSettings,
+                      explanationStyle: e.target.value as ExplanationStyle,
+                    })
+                  }
+                  className="w-full px-2 py-1.5 rounded-lg bg-slate-900 border border-slate-800 text-white text-xs focus:outline-none focus:border-[#6658FF]"
+                >
+                  <option value="step_by_step">Step-by-Step</option>
+                  <option value="concise">Concise</option>
+                  <option value="architecture_first">Architecture First</option>
+                  <option value="example_driven">Example Driven</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-[10px] font-semibold text-slate-400 mb-1">
+                  Team Size
+                </label>
+                <input
+                  type="number"
+                  min={1}
+                  max={12}
+                  placeholder="Default"
+                  value={localSettings.teamSize ?? ''}
+                  onChange={(e) =>
+                    setLocalSettings({
+                      ...localSettings,
+                      teamSize: e.target.value ? Number(e.target.value) : undefined,
+                    })
+                  }
+                  className="w-full px-2 py-1.5 rounded-lg bg-slate-900 border border-slate-800 text-white text-xs focus:outline-none focus:border-[#6658FF]"
+                />
+              </div>
+              <div>
+                <label className="block text-[10px] font-semibold text-slate-400 mb-1">
+                  Timeline (Weeks)
+                </label>
+                <input
+                  type="number"
+                  min={1}
+                  max={52}
+                  placeholder="Default"
+                  value={localSettings.durationWeeks ?? ''}
+                  onChange={(e) =>
+                    setLocalSettings({
+                      ...localSettings,
+                      durationWeeks: e.target.value ? Number(e.target.value) : undefined,
+                    })
+                  }
+                  className="w-full px-2 py-1.5 rounded-lg bg-slate-900 border border-slate-800 text-white text-xs focus:outline-none focus:border-[#6658FF]"
+                />
+              </div>
             </div>
           </div>
 

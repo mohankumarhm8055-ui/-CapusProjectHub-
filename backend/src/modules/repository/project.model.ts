@@ -91,6 +91,7 @@ export interface IProject {
   futureEnhancements?: string[]
   references?: string[]
   academicYear: string
+  batch?: string
   semester?: string
   department: string
   collegeId: string
@@ -159,6 +160,7 @@ const ProjectSchema = new Schema<ProjectDocument>(
     futureEnhancements: [{ type: String }],
     references: [{ type: String }],
     academicYear: { type: String, required: true, index: true },
+    batch: { type: String },
     semester: { type: String },
     department: { type: String, required: true, index: true },
     collegeId: { type: String, required: true, index: true, default: 'rvce-main' },
@@ -342,6 +344,7 @@ export function mapProjectDoc(doc: any): IProject {
     futureEnhancements: doc.futureEnhancements || [],
     references: doc.references || [],
     academicYear: doc.academicYear,
+    batch: doc.batch,
     semester: doc.semester,
     department: doc.department,
     collegeId: doc.collegeId,

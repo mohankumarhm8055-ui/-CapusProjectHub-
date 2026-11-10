@@ -12,19 +12,42 @@ import { errorHandler } from './middleware/error.middleware.js'
 export function createApp(): Express {
   const app = express()
 
-  // CORS configuration
+  // Remove Express framework signature header
+  app.disable('x-powered-by')
+
+  // Baseline HTTP security headers
+  app.use((_req, res, next) => {
+    res.setHeader('X-Content-Type-Options', 'nosniff')
+    res.setHeader('X-Frame-Options', 'DENY')
+    res.setHeader('Referrer-Policy', 'no-referrer')
+    res.setHeader('Permissions-Policy', 'camera=(), geolocation=()')
+    res.setHeader('Cross-Origin-Resource-Policy', 'same-site')
+    next()
+  })
+
+  // Environment-aware CORS configuration
+  const configuredOrigins = config.CLIENT_URL.split(',')
+    .map((o) => o.trim())
+    .filter(Boolean)
+  const devOrigins = ['http://localhost:5173', 'http://localhost:5174', 'http://127.0.0.1:5173']
+  const allowedOrigins =
+    config.NODE_ENV === 'production'
+      ? configuredOrigins
+      : Array.from(new Set([...configuredOrigins, ...devOrigins]))
+
   app.use(
     cors({
-      origin: [config.CLIENT_URL, 'http://localhost:5173', 'http://localhost:5174', 'http://127.0.0.1:5173'],
+      origin: allowedOrigins,
       credentials: true,
       methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
       allowedHeaders: ['Content-Type', 'Authorization', 'Accept'],
     })
   )
 
-  // Request parsing with generous limits for audio recordings & documents
-  app.use(express.json({ limit: '25mb' }))
-  app.use(express.urlencoded({ extended: true, limit: '25mb' }))
+  // Audio uploads on voice endpoints can accept larger base64 payloads; standard JSON endpoints stay bounded at 2MB
+  app.use('/api/ai/voice', express.json({ limit: '25mb' }))
+  app.use(express.json({ limit: '2mb' }))
+  app.use(express.urlencoded({ extended: true, limit: '2mb' }))
 
   // Health check endpoint (includes persistence readiness)
   app.get('/health', (_req, res) => {

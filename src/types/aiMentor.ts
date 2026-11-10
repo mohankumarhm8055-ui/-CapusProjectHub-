@@ -57,11 +57,18 @@ export interface VoiceTranscriptTurn {
   language?: string
 }
 
+export type ExplanationLevel = 'beginner' | 'intermediate' | 'advanced'
+export type ExplanationStyle = 'step_by_step' | 'concise' | 'architecture_first' | 'example_driven'
+
 export interface MentorSettings {
   personality: 'strict-examiner' | 'supportive-guide' | 'technical-architect'
   academicLevel: 'undergraduate' | 'postgraduate' | 'diploma'
   citationFormat: 'ieee' | 'acm' | 'apa'
   enforceAcademicIntegrity: boolean
+  explanationLevel?: ExplanationLevel
+  explanationStyle?: ExplanationStyle
+  teamSize?: number
+  durationWeeks?: number
   voiceLanguage?: SpokenLanguage
   defaultPlaybackSpeed?: AudioPlaybackSpeed
   enableVoiceInterruption?: boolean

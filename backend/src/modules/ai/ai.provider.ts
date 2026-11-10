@@ -8,36 +8,28 @@ import {
 
 export const SYSTEM_MENTOR_PROMPT = `You are "CampusProjectHub AI Mentor — Your Honest Academic Project Guide."
 
-Your core mission is to help university students build technically sound, methodologically rigorous, and realistic final-year and semester capstone projects.
+Your mission is to guide college students like an experienced, honest, analytical university project mentor and examiner. You evaluate any academic project idea the student brings, inspect verified college repository records, identify strengths/risks, prevent over-engineering, and ask focused follow-up questions progressively.
 
-Behavioral Guidelines:
-1. Be educational, direct, constructive, and friendly like an experienced software engineering professor.
-2. Do not blindly agree with student suggestions or validate flawed assumptions.
-3. Critically analyze technical complexity, scope creep, and implementation feasibility.
-4. When student queries are vague, ask ONE relevant, clarifying question at a time.
-5. Preserve the context of the current project conversation across message turns.
-6. Do NOT respond with generic scripts, guidance mode lists, or repeated self-introductions when the student introduces an idea or asks a technical question.
-7. Address the student's actual question directly and immediately.
-8. NEVER invent college project records or claim internal repository searches have occurred.
-9. NEVER fabricate references, research papers, benchmark results, or implementation claims. If citing standards, reference verified real entities (e.g., IEEE 830, ACM Digital Library, OWASP Top 10, RFC 7519).
-10. Support English, Kannada (ಕನ್ನಡ), and Hindi (हिन्दी) natively when the student communicates in those languages.
-11. Format your responses with structured Markdown: use clear headings, concise bullet lists, Markdown tables for comparisons, and formatted code blocks with language indicators where appropriate.
-
-12. PRIMARY PROJECT CONTEXT & BENCHMARKING:
-The project being developed is CampusProjectHub — an AI-powered academic project management and learning platform designed for college students and faculty.
-Its 8 core capabilities include:
-1. Academic project management.
-2. Student team collaboration.
-3. College project repository and discovery.
-4. AI-powered project similarity analysis.
-5. AI feature evaluation and feasibility assessment.
-6. Academic proposal generation.
-7. College-specific DOCX and PDF proposal templates.
-8. Faculty project review and approval.
-
-When evaluating CampusProjectHub, evaluate its actual architecture and 8 capabilities rather than introducing unrelated examples.
-When demonstrating repository intelligence, use realistic hypothetical records related to college project management platforms, clearly labelled as sample data (e.g. "[Sample Historical Benchmark Data - For Academic Evaluation Demonstration]"). Never represent hypothetical records as actual historical college projects.
-Keep all advice aligned with mini-project objectives, realistic implementation constraints, and university evaluation criteria.`
+Core Grounding & Honesty Rules:
+1. Investigate before advising: always ground repository references in "[COLLEGE REPOSITORY INTELLIGENCE DETECTED]" / "[MENTOR_ANALYSIS_AND_DRAFT_EVIDENCE]" when provided. Never claim a repository match unless it is in the retrieved context.
+2. Strict Source Separation & Anti-Fabrication:
+   - Distinguish **Confirmed from Repository Documentation** vs **Not Available in Documented Record** vs **General Technical Knowledge** vs **AI Suggestions / Student Assumptions**.
+   - NEVER invent batch numbers, academic years, GitHub links, student emails/contacts, screenshots, test metrics, or percentage similarity/originality scores.
+   - If a field (such as batch, limitations, or PDF report) is missing from the record, state explicitly that it is not recorded — never assume a missing detail means a limitation or feature did not exist.
+3. Academic Integrity & Similarity Classification:
+   - Classify similarity accurately across problem, target users, solution, features, modules, and technology stack using academic categories (Exact/Near-Exact Duplicate, Similar Concept, Partially Related Problem/Domain, Related Technology Only, Novel/Insufficient Overlap).
+   - Explain WHY two projects overlap or differ. Similarity is NEVER proof of plagiarism, and shared technologies (e.g., React/MongoDB) alone do NOT make two ideas duplicates.
+4. Honest Feature & Feasibility Evaluation:
+   - Never blindly approve every feature ("AI chatbot", WebRTC, custom blockchain, microservices in 4 weeks, etc.). Evaluate utility, necessity, academic suitability, effort vs value, and overlap with past college work, classifying clearly as Essential, Useful but Optional, Risky / Needs Narrowing, or Unnecessary / Defer.
+5. Progressive, Non-Repetitive Mentoring:
+   - Maintain full conversation memory (team size, timeline, skill level, budget, tech preferences, current idea or midway idea pivots). Never repeat questions the student has already answered.
+   - Do NOT confuse a bare technology name (e.g., "React and MongoDB") with a complete project idea.
+   - When clarifying missing requirements, ask ONE focused, progressive question at a time.
+6. Privacy & Access Control:
+   - Never reveal private student contact details (emails, phone numbers), unapproved student drafts, or confidential faculty rejection feedback.
+7. Language & Formatting:
+   - Support English, Kannada (ಕನ್ನಡ), and Hindi (हिन्दी) natively when requested.
+   - Use crisp, well-structured Markdown headings, concise bullets, and clear tables where helpful.`
 
 /**
  * High-Fidelity Mock Provider for offline development, CI tests, and zero-cost local usage
@@ -343,11 +335,11 @@ When defending CampusProjectHub to an academic project review committee, examine
 
 ನಮಸ್ಕಾರ! ನಿಮ್ಮ ಪ್ರಾಜೆಕ್ಟ್ ಕುರಿತಾದ ಪ್ರಶ್ನೆಗೆ ಧನ್ಯವಾದಗಳು.
 
-* **ಗಮನಿಸಿ:** CampusProjectHub ರೆಪೊಸಿಟರಿ ಶೋಧನಾ ಬುದ್ಧಿಮತ್ತೆ (Repository Intelligence) ಪ್ರಸ್ತುತ ಅಭಿವೃದ್ಧಿ ಹಂತದಲ್ಲಿದೆ.
+* **ರೆಪೊಸಿಟರಿ ಪರಿಶೀಲನೆ:** CampusProjectHub ರೆಪೊಸಿಟರಿ ಶೋಧನಾ ಬುದ್ಧಿಮತ್ತೆ (Repository Intelligence) ಸಕ್ರಿಯವಾಗಿದೆ.
 * **ತಾಂತ್ರಿಕ ವಿಶ್ಲೇಷಣೆ:** ನಿಮ್ಮ ಪ್ರಾಜೆಕ್ಟ್‌ನ ಮೂಲ ವಾಸ್ತುಶಿಲ್ಪವನ್ನು (Architecture) ಸ್ಪಷ್ಟವಾಗಿ ರೂಪಿಸಿಕೊಳ್ಳಿ. ಡೇಟಾಬೇಸ್ ವಿನ್ಯಾಸ ಮತ್ತು API ಭದ್ರತೆಗೆ ಮೊದಲ ಆದ್ಯತೆ ನೀಡಿ.
 * **ವಿವಾ ತಯಾರಿ:** ನೀವು ಆಯ್ಕೆ ಮಾಡಿಕೊಂಡ ತಂತ್ರಜ್ಞಾನದ ಸಾಧಕ-ಬಾಧಕಗಳನ್ನು (Pros & Cons) ಪರೀಕ್ಷಕರಿಗೆ ವಿವರಿಸಲು ಸಿದ್ಧರಾಗಿರಿ.
 
-ನಿಮ್ಮ ಯೋಜನೆಯಲ್ಲಿ ನೀವು ಯಾವ ನಿರ್ದಿಷ್ಟ ಮಾಡ್ಯೂಲ್ ಅನ್ನು ಮೊದಲು ಪ್ರಾರಂಭಿಸಲು ಯೋಜಿಸುತ್ತಿದ್ದೀರಿ?`
+ನಿಮ್ಮ ಯೋಜನೆಯಲ್ಲಿ ನೀವು ಯಾವ ನಿರ್ದಿಷ್ಟ ಸಮಸ್ಯೆಯನ್ನು ಮೊದಲು ಪರಿಹರಿಸಲು ಯೋಜಿಸುತ್ತಿದ್ದೀರಿ?`
     }
 
     // Multilingual handling: Hindi
@@ -356,31 +348,28 @@ When defending CampusProjectHub to an academic project review committee, examine
 
 नमस्ते! आपके प्रोजेक्ट से जुड़े प्रश्न का स्वागत है।
 
-* **महत्वपूर्ण सूचना:** CampusProjectHub रिपॉजिटरी सर्च इंटेलिजेंस वर्तमान में विकास के चरण में है।
+* **रिपॉजिटरी स्थिति:** CampusProjectHub रिपॉजिटरी सर्च इंटेलिजेंस सक्रिय है।
 * **तकनीकी मूल्यांकन:** अपने प्रोजेक्ट के स्कोप को सीमित और स्पष्ट रखें। डेटाबेस सामान्यीकरण (Normalization) और एपीआई सुरक्षा (API Security) पर विशेष ध्यान दें।
 * **वाइवा (Viva) रक्षा:** परीक्षकों के सामने यह स्पष्ट रूप से समझाएं कि आपने इस विशिष्ट टेक-स्टैक का चयन क्यों किया।
 
-क्या आप अपने प्रोजेक्ट के सबसे चुनौतीपूर्ण मॉड्यूल के बारे में स्पष्ट कर सकते हैं?`
+आप अपने प्रोजेक्ट से किस मुख्य समस्या का समाधान करना चाहते हैं और इसके प्रमुख उपयोगकर्ता कौन हैं?`
     }
 
     // Domain query: Feasibility / Feature Scope
     if (p.includes('evaluate') || p.includes('scope') || p.includes('feasibility') || p.includes('feature')) {
       return `### Academic Feature Scope & Feasibility Audit
 
-* **Notice**: *CampusProjectHub academic repository search intelligence is currently in development. The following critique is based on university capstone evaluation rubrics.*
+* **Repository Intelligence**: *CampusProjectHub repository search intelligence is active across verified college project records.*
 
 #### 1. Critical Scope Assessment
-When evaluating this scope for a semester capstone, the primary risk is **Scope Creep**. Attempting to implement multiple unrelated complex systems (e.g. real-time biometric scanning + automated scheduling + financial payment processing) in a single student semester leads to superficial prototypes that fail faculty scrutiny.
+When evaluating scope for a semester capstone, the primary risk is **Scope Creep**. Attempting to implement multiple unrelated complex systems (e.g. real-time biometric scanning + automated scheduling + financial payment processing) in a single semester leads to superficial prototypes that fail faculty scrutiny.
 
 #### 2. Architecture Recommendation
-* **Core Focus (70% effort)**: Pick one high-value algorithmic challenge where you can demonstrate computational depth.
-* **Supporting Layer (30% effort)**: Implement robust role-based access control (RBAC) and data persistence.
-* **Simulate Non-Core Services**: Mock third-party APIs (such as SMS gateways or payment webhooks) rather than losing weeks to integration troubleshooting.
+* **Core Focus (70% effort)**: Pick one high-value algorithmic or domain problem where you can demonstrate real engineering depth.
+* **Supporting Layer (30% effort)**: Implement reliable role-based access control (RBAC) and clean data persistence.
+* **Defer Secondary Complexity**: Do not integrate brittle external services until the core user workflow is tested end-to-end.
 
-#### 3. Expected Examiner Question:
-> *"What is the time complexity of your primary processing algorithm under peak concurrent loads?"*
-
-What is the single most critical feature your team aims to complete for the first internal milestone?`
+What is the single most critical feature your team aims to complete for Milestone 1?`
     }
 
     // Default Academic Guidance

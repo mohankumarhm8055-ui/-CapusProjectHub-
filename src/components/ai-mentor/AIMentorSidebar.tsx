@@ -57,10 +57,13 @@ export const AIMentorSidebar: React.FC<AIMentorSidebarProps> = ({
   const [renameValue, setRenameValue] = useState('')
   const [deletingId, setDeletingId] = useState<string | null>(null)
 
-  // Filter conversations by search
-  const filteredConversations = conversations.filter((c) =>
-    c.title.toLowerCase().includes(searchQuery.toLowerCase().trim())
-  )
+  // Filter conversations by title or any loaded message content (helps students relocate prior replies)
+  const trimmedSearch = searchQuery.toLowerCase().trim()
+  const filteredConversations = conversations.filter((c) => {
+    if (!trimmedSearch) return true
+    if (c.title.toLowerCase().includes(trimmedSearch)) return true
+    return c.messages.some((m) => m.content.toLowerCase().includes(trimmedSearch))
+  })
 
   const groups: ConversationGroup[] = ['Today', 'Yesterday', 'Previous 7 Days']
 
@@ -178,15 +181,21 @@ export const AIMentorSidebar: React.FC<AIMentorSidebarProps> = ({
               <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
               <input
                 type="text"
-                placeholder="Search conversations..."
+                aria-label="Search conversations or previous loaded replies"
+                placeholder="Search conversations or replies..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-8 pr-3 py-1.5 rounded-lg text-xs bg-slate-900 border border-slate-800 text-slate-200 placeholder:text-slate-500 focus:outline-none focus:border-[#6658FF] focus:ring-1 focus:ring-[#6658FF] transition-all"
+                onKeyDown={(e) => {
+                  if (e.key === 'Escape' && searchQuery) setSearchQuery('')
+                }}
+                className="w-full pl-8 pr-7 py-1.5 rounded-lg text-xs bg-slate-900 border border-slate-800 text-slate-200 placeholder:text-slate-400 focus:outline-none focus:border-[#6658FF] focus:ring-1 focus:ring-[#6658FF] transition-all"
               />
               {searchQuery && (
                 <button
+                  type="button"
+                  aria-label="Clear search query"
                   onClick={() => setSearchQuery('')}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300"
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-200 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#6658FF] rounded"
                 >
                   <X className="w-3 h-3" />
                 </button>
@@ -216,11 +225,23 @@ export const AIMentorSidebar: React.FC<AIMentorSidebarProps> = ({
                   return (
                     <div
                       key={conv.id}
+                      role="button"
+                      tabIndex={0}
+                      aria-current={isActive ? 'page' : undefined}
                       onClick={() => {
                         onSelectConversation(conv.id)
                         onCloseMobile()
                       }}
-                      className={`group relative flex items-center gap-2.5 px-2.5 py-2 rounded-xl text-xs font-medium cursor-pointer transition-all ${
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault()
+                          onSelectConversation(conv.id)
+                          onCloseMobile()
+                        } else if (e.key === 'Escape' && isMenuOpen) {
+                          setActiveMenuId(null)
+                        }
+                      }}
+                      className={`group relative flex items-center gap-2.5 px-2.5 py-2 rounded-xl text-xs font-medium cursor-pointer transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6658FF] ${
                         isActive
                           ? 'bg-[#6658FF]/15 text-white border border-[#6658FF]/40'
                           : 'text-slate-300 hover:text-white hover:bg-slate-850/80'
@@ -248,12 +269,15 @@ export const AIMentorSidebar: React.FC<AIMentorSidebarProps> = ({
                           <div className="relative">
                             <button
                               type="button"
+                              aria-label={`Options for conversation ${conv.title}`}
+                              aria-expanded={isMenuOpen}
+                              aria-haspopup="menu"
                               onClick={(e) => {
                                 e.stopPropagation()
                                 setActiveMenuId(isMenuOpen ? null : conv.id)
                               }}
-                              className={`p-1 rounded-md text-slate-400 hover:text-white hover:bg-slate-800 transition-colors ${
-                                isMenuOpen ? 'opacity-100 bg-slate-800' : 'opacity-0 group-hover:opacity-100'
+                              className={`p-1 rounded-md text-slate-400 hover:text-white hover:bg-slate-800 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6658FF] ${
+                                isMenuOpen ? 'opacity-100 bg-slate-800' : 'opacity-0 group-hover:opacity-100 focus-visible:opacity-100'
                               }`}
                               title="Conversation options"
                             >

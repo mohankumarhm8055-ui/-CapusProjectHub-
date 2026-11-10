@@ -28,6 +28,7 @@ import { aiMentorApiService, type ConversationContextData } from '../services/ai
 import { aiEvaluationApiService } from '../services/aiEvaluationApiService'
 import { aiProposalApiService } from '../services/aiProposalApiService'
 import { RequestGuidanceModal } from '../components/connections/RequestGuidanceModal'
+import type { MessageFeedbackPayload, StoredFeedbackState } from '../components/ai-mentor/ChatMessage'
 import type {
   EvaluationRecord,
   DecisionStatus,
@@ -67,6 +68,7 @@ export const AIMentorPage: React.FC = () => {
   const [isEvaluating, setIsEvaluating] = useState(false)
   const [isGeneratingProposal, setIsGeneratingProposal] = useState(false)
   const [workspaceError, setWorkspaceError] = useState<string | null>(null)
+  const [feedbackByMessageId, setFeedbackByMessageId] = useState<Record<string, StoredFeedbackState>>({})
   const [guidanceTarget, setGuidanceTarget] = useState<{
     projectId: string
     projectTitle: string
@@ -87,14 +89,23 @@ export const AIMentorPage: React.FC = () => {
 
   const syncConversationWorkspace = async (convId: string) => {
     try {
-      const [ctx, evalRec] = await Promise.all([
+      const [ctx, evalRec, fbMap] = await Promise.all([
         aiMentorApiService.getConversationContext(convId).catch(() => null),
         aiEvaluationApiService.getLatestByConversation(convId).catch(() => null),
+        aiMentorApiService.getConversationFeedback(convId).catch(() => ({})),
       ])
       setConversationContext(ctx)
       setCurrentEvaluation(evalRec)
+      setFeedbackByMessageId(fbMap || {})
     } catch {
       // Keep existing state on transient error
+    }
+  }
+
+  const handleSubmitFeedback = async (messageId: string, payload: MessageFeedbackPayload) => {
+    setFeedbackByMessageId((prev) => ({ ...prev, [messageId]: payload }))
+    if (backendStatus.isConnected && activeConversationId && !activeConversationId.startsWith('conv-')) {
+      await aiMentorApiService.submitMessageFeedback(activeConversationId, messageId, payload)
     }
   }
 
@@ -119,9 +130,37 @@ export const AIMentorPage: React.FC = () => {
           )
         }
         try {
-          const remoteConvs = await aiMentorApiService.listConversations()
+          const [remoteConvs, remoteProfile] = await Promise.all([
+            aiMentorApiService.listConversations(),
+            aiMentorApiService.getLearningProfile(),
+          ])
           if (isMounted && remoteConvs.length > 0) {
             setConversations(remoteConvs)
+            const savedId = sessionStorage.getItem('cph_active_mentor_conv')
+            if (savedId && remoteConvs.some((rc) => rc.id === savedId)) {
+              setActiveConversationId(savedId)
+              try {
+                const { messages } = await aiMentorApiService.getConversation(savedId)
+                if (isMounted) {
+                  setConversations((prev) =>
+                    prev.map((c) => (c.id === savedId ? { ...c, messages } : c))
+                  )
+                  syncConversationWorkspace(savedId)
+                }
+              } catch {
+                // Allow manual selection if restore fetch fails
+              }
+            }
+          }
+          if (isMounted && remoteProfile) {
+            setSettings((prev) => ({
+              ...prev,
+              explanationLevel: remoteProfile.explanationLevel || prev.explanationLevel,
+              explanationStyle: remoteProfile.explanationStyle || prev.explanationStyle,
+              voiceLanguage: remoteProfile.preferredLanguage || prev.voiceLanguage,
+              teamSize: remoteProfile.defaultConstraints?.teamSize ?? prev.teamSize,
+              durationWeeks: remoteProfile.defaultConstraints?.durationWeeks ?? prev.durationWeeks,
+            }))
           }
         } catch (err: any) {
           if (isMounted && err?.message) {
@@ -180,6 +219,11 @@ export const AIMentorPage: React.FC = () => {
   // Handle selecting an existing conversation and fetching messages + context + evaluation
   const handleSelectConversation = async (id: string) => {
     setActiveConversationId(id)
+    try {
+      sessionStorage.setItem('cph_active_mentor_conv', id)
+    } catch {
+      // ignore storage failure
+    }
     setIsGenerating(false)
     setWorkspaceError(null)
     setCurrentEvaluation(null)
@@ -236,10 +280,21 @@ export const AIMentorPage: React.FC = () => {
     localStorage.removeItem('campusprojecthub_ai_mentor_conversations')
   }
 
-  // Handle saving settings
+  // Handle saving settings (persists locally and syncs to backend Student Learning Profile)
   const handleSaveSettings = (newSettings: MentorSettings) => {
     setSettings(newSettings)
     saveSettings(newSettings)
+    if (backendStatus.isConnected) {
+      aiMentorApiService.updateLearningProfile({
+        explanationLevel: newSettings.explanationLevel,
+        explanationStyle: newSettings.explanationStyle,
+        preferredLanguage: newSettings.voiceLanguage || 'auto',
+        defaultConstraints: {
+          teamSize: newSettings.teamSize,
+          durationWeeks: newSettings.durationWeeks,
+        },
+      })
+    }
   }
 
   // Stop generation control
@@ -548,8 +603,8 @@ export const AIMentorPage: React.FC = () => {
               syncConversationWorkspace(remoteTargetConvId)
             },
             onError: (err) => {
-              console.warn('Streaming fallback triggered:', err)
-              const fallbackResponse = generateAcademicResponse(text, settings)
+              const reason = err?.message || 'Unable to reach AI Mentor service or persistent database.'
+              setWorkspaceError(reason)
               setConversations((prev) =>
                 prev.map((c) => {
                   if (c.id === remoteTargetConvId || c.id === targetConvId) {
@@ -557,7 +612,11 @@ export const AIMentorPage: React.FC = () => {
                       ...c,
                       messages: c.messages.map((m) =>
                         m.id === assistantMsgId
-                          ? { ...m, content: fallbackResponse.content, status: 'completed', suggestedFollowUps: fallbackResponse.suggestedFollowUps }
+                          ? {
+                              ...m,
+                              content: `⚠️ **Response Interrupted / Unavailable**: ${reason}\n\nClick **Retry** below once the connection or authentication session is restored.`,
+                              status: 'failed',
+                            }
                           : m
                       ),
                     }
@@ -702,8 +761,10 @@ export const AIMentorPage: React.FC = () => {
           <div className="flex items-center gap-2 sm:gap-3">
             {/* 7-Dimensional Feature Evaluation Trigger */}
             <button
+              type="button"
               onClick={() => setIsAssessmentModalOpen(true)}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold text-purple-700 bg-purple-50 hover:bg-purple-100 border border-purple-200 transition-all cursor-pointer shadow-xs active:scale-95"
+              aria-label="Open 7-Dimensional Feature Evaluation"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold text-purple-700 bg-purple-50 hover:bg-purple-100 border border-purple-200 transition-all cursor-pointer shadow-xs active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6658FF]"
               title="Launch 7-Dimensional Feature Evaluation"
             >
               <Layers className="w-3.5 h-3.5 text-purple-600" />
@@ -712,9 +773,11 @@ export const AIMentorPage: React.FC = () => {
 
             {/* Academic Proposal Workspace Trigger */}
             <button
+              type="button"
               onClick={handleOpenProposalGenerator}
               disabled={isGeneratingProposal}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 transition-all cursor-pointer shadow-xs active:scale-95"
+              aria-label="Open Academic Proposal Generator"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 transition-all cursor-pointer shadow-xs active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6658FF]"
               title="Generate or Edit Academic Proposal (IEEE 830)"
             >
               <FileText className="w-3.5 h-3.5 text-indigo-600" />
@@ -725,8 +788,10 @@ export const AIMentorPage: React.FC = () => {
 
             {/* Launch Voice Mode Preview */}
             <button
+              type="button"
               onClick={() => setIsVoiceOpen(true)}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold text-[#6658FF] bg-[#6658FF]/10 hover:bg-[#6658FF]/20 border border-[#6658FF]/20 transition-all cursor-pointer shadow-xs active:scale-95"
+              aria-label="Open AI Voice Mode"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold text-[#6658FF] bg-[#6658FF]/10 hover:bg-[#6658FF]/20 border border-[#6658FF]/20 transition-all cursor-pointer shadow-xs active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6658FF]"
               title="Launch AI Voice Mode (Preview)"
             >
               <Headphones className="w-3.5 h-3.5" />
@@ -775,12 +840,18 @@ export const AIMentorPage: React.FC = () => {
             {/* API Error Banner */}
             {workspaceError && (
               <div className="px-4 sm:px-6 lg:px-8 max-w-5xl mx-auto w-full pt-3">
-                <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs flex items-center justify-between gap-3">
+                <div
+                  role="alert"
+                  aria-live="polite"
+                  className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs flex items-center justify-between gap-3"
+                >
                   <div className="flex items-center gap-2">
                     <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
                     <span>{workspaceError}</span>
                   </div>
                   <button
+                    type="button"
+                    aria-label="Dismiss error banner"
                     onClick={() => setWorkspaceError(null)}
                     className="font-bold text-rose-700 hover:text-rose-950 cursor-pointer"
                   >
@@ -907,6 +978,9 @@ export const AIMentorPage: React.FC = () => {
                 onStopGeneration={handleStopGeneration}
                 onSelectFollowUp={(prompt) => handleSendMessage(prompt)}
                 onRetry={handleRetryMessage}
+                isOfflineDemo={!backendStatus.isConnected}
+                feedbackByMessageId={feedbackByMessageId}
+                onSubmitFeedback={handleSubmitFeedback}
               />
             )}
           </div>

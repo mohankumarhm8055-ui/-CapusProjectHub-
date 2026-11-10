@@ -15,6 +15,10 @@ export interface IMessage {
     provider?: string
     model?: string
     tokensUsed?: number
+    responseLatencyMs?: number
+    retrievalLatencyMs?: number
+    retrievedRecordsCount?: number
+    retrievalFailed?: boolean
   }
 }
 
@@ -36,6 +40,10 @@ const MessageSchema = new Schema<MessageDocument>(
       provider: { type: String },
       model: { type: String },
       tokensUsed: { type: Number },
+      responseLatencyMs: { type: Number },
+      retrievalLatencyMs: { type: Number },
+      retrievedRecordsCount: { type: Number },
+      retrievalFailed: { type: Boolean },
     },
   },
   {

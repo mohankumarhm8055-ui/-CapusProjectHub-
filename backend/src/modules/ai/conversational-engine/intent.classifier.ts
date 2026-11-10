@@ -1,13 +1,65 @@
 import { StudentIntent, IConversationContext } from './context.types.js'
+import { ideaAnalyzer } from './idea.analyzer.js'
 
 export class IntentClassifier {
   /**
-   * Classifies student message intent based on text, active context, and history
+   * Classifies student message intent using text, active repository memory, and stage
    */
   classifyIntent(message: string, context: IConversationContext): StudentIntent {
     const lower = message.toLowerCase().trim()
 
-    // 1. Comparison Inquiry (Trello, Jira, Google Drive, WhatsApp, what makes different, etc.)
+    // 0. Return to Earlier Project Discussion (if student previously pitched another idea)
+    if (
+      (context.previousProjectIdeas && context.previousProjectIdeas.length > 0) &&
+      (lower.includes('go back to') ||
+        lower.includes('return to') ||
+        lower.includes('revisit') ||
+        lower.includes('back to the attendance') ||
+        lower.includes('earlier project') ||
+        lower.includes('previous idea we discussed'))
+    ) {
+      return 'RETURN_TO_PRIOR_PROJECT'
+    }
+
+    // 0a. Midway Idea Switch / Pivot (exclude language/tech/constraint corrections)
+    const isConstraintCorrection =
+      lower.startsWith('correction:') ||
+      lower.includes('switch to kannada') ||
+      lower.includes('switch to hindi') ||
+      lower.includes('switch to english') ||
+      lower.includes('switch language') ||
+      /\binstead of (?:mongodb|mysql|postgresql|react|python|flask|express)\b/i.test(lower)
+
+    if (
+      !isConstraintCorrection &&
+      (lower.includes('instead') ||
+        lower.includes('change my idea') ||
+        lower.includes('changed my mind') ||
+        lower.includes('switch to') ||
+        lower.includes('forget that') ||
+        lower.includes('new project idea') ||
+        lower.includes('different idea'))
+    ) {
+      return 'IDEA_CHANGE_PIVOT'
+    }
+
+    // 0b. Restricted / Private Record Access Requests (zero-leakage guard)
+    if (
+      lower.includes('private email') ||
+      lower.includes('personal email') ||
+      lower.includes('phone number') ||
+      lower.includes('contact number') ||
+      lower.includes('rejection reason') ||
+      lower.includes('internal feedback') ||
+      lower.includes('faculty rejection') ||
+      lower.includes('unapproved draft') ||
+      lower.includes('private draft') ||
+      lower.includes('restricted project')
+    ) {
+      return 'RESTRICTED_INFO_INQUIRY'
+    }
+
+    // 1. Comparison Inquiry (Trello, Jira, Google Drive, WhatsApp, etc.)
     if (
       lower.includes('different from trello') ||
       lower.includes('compare with trello') ||
@@ -120,63 +172,139 @@ export class IntentClassifier {
       return 'FACULTY_EXPLANATION'
     }
 
-    // 1g. College Scope Affirmation / Continuation (e.g. "Yes, specifically for college students.")
+    // 1g-b. Structured Multi-Project Comparison & Existing vs Proposed Analysis
+    const extracted = ideaAnalyzer.extractProposedImprovements(message)
+    if (
+      lower.includes('compare with previous projects') ||
+      lower.includes('compare multiple projects') ||
+      lower.includes('compare across repository') ||
+      lower.includes('compare existing') ||
+      lower.includes('compare my proposed') ||
+      lower.includes('compare our proposed') ||
+      lower.includes('across our existing college') ||
+      (lower.includes('compare ') && lower.includes(' vs ') && lower.includes('repository')) ||
+      lower.includes('structured comparison') ||
+      lower.includes('12-dimension comparison') ||
+      lower.includes('research gap analysis') ||
+      lower.includes('identify research gaps') ||
+      lower.includes('how does our idea differentiate') ||
+      lower.includes('how does my idea differentiate') ||
+      lower.includes('which features differentiate') ||
+      (lower.includes('project management') && extracted.improvements.length > 0 && !lower.startsWith('what '))
+    ) {
+      return 'MULTI_PROJECT_COMPARISON'
+    }
+
+    // 1h. Repository Follow-up Inquiries (Batch, Stack, Improvements, Originality)
+    if (
+      lower.includes('which batch') ||
+      lower.includes('what batch') ||
+      lower.includes('which cohort') ||
+      lower.includes('who developed that') ||
+      lower.includes('who built that') ||
+      lower.includes('when was it built') ||
+      (lower.includes('batch') && (lower.includes('project') || lower.includes('previous') || lower.includes('matching') || lower.includes('senior')))
+    ) {
+      return 'REPOSITORY_BATCH_INQUIRY'
+    }
+
+    if (
+      (lower.includes('tech stack') ||
+        lower.includes('technology stack') ||
+        lower.includes('technologies') ||
+        lower.includes('framework')) &&
+      (lower.includes('previous') ||
+        lower.includes('earlier') ||
+        lower.includes('did they use') ||
+        lower.includes('matching') ||
+        Boolean(context.matchedRepositoryProject)) &&
+      !lower.includes('campusprojecthub')
+    ) {
+      return 'REPOSITORY_TECH_INQUIRY'
+    }
+
+    if (
+      lower.includes('what can be improved') ||
+      lower.includes('what could be improved') ||
+      lower.includes('how can we improve') ||
+      lower.includes('what improvements') ||
+      lower.includes('gaps in the previous') ||
+      lower.includes('limitations of the previous') ||
+      lower.includes('documented hurdles') ||
+      lower.includes('make our implementation technically novel') ||
+      (lower.includes('improve') && (lower.includes('previous') || Boolean(context.matchedRepositoryProject)))
+    ) {
+      return 'REPOSITORY_IMPROVEMENTS_INQUIRY'
+    }
+
+    if (
+      lower.includes('is my idea original') ||
+      lower.includes('is this idea original') ||
+      lower.includes('is this original') ||
+      lower.includes('already exist') ||
+      lower.includes('is it a duplicate') ||
+      lower.includes('is this duplicate') ||
+      lower.includes('plagiarism') ||
+      lower.includes('originality')
+    ) {
+      return 'REPOSITORY_ORIGINALITY_INQUIRY'
+    }
+
+    // 1i. College Scope Affirmation
     if (
       lower.includes('specifically for college') ||
       lower.includes('for college students') ||
       lower.includes('college students and faculty') ||
       ((lower.startsWith('yes') || lower.includes('yeah') || lower.includes('correct') || lower.includes('agree')) &&
-        (lower.includes('college') || lower.includes('students') || lower.includes('academic') || lower.includes('university') || context.currentProjectIdea?.includes('College') || context.currentDiscussionStage === 'DISCOVERY_REFERENCE_INTRODUCED'))
+        (lower.includes('college') ||
+          lower.includes('students') ||
+          lower.includes('academic') ||
+          lower.includes('university') ||
+          context.currentProjectIdea?.includes('College') ||
+          context.currentDiscussionStage === 'DISCOVERY_REFERENCE_INTRODUCED'))
     ) {
       return 'COLLEGE_SCOPE_AFFIRMATION'
     }
 
-    // 2. Feature Addition / Feasibility Evaluation
-    const isBuildingProject =
+    // 2. General Feature Addition / Evaluation (works for ANY proposed feature in multi-turn chat!)
+    const isBuildingWholeProject =
       lower.includes('build a ') ||
       lower.includes('create a ') ||
       lower.includes('develop a ') ||
-      lower.includes('developing ') ||
       lower.includes('project on ') ||
-      lower.includes('project idea')
+      lower.includes('project idea') ||
+      lower.includes('portal') ||
+      lower.includes('platform') ||
+      lower.includes('system') ||
+      lower.includes('application')
 
-    const isFeatureAdditionInquiry =
-      !isBuildingProject &&
-      (lower.includes('add') ||
-        lower.includes('include') ||
-        lower.includes('incorporate') ||
-        lower.includes('feasibility') ||
-        lower.includes('should i') ||
-        lower.includes('should we') ||
-        lower.includes('can i') ||
-        lower.includes('can we') ||
-        lower.includes('want to add') ||
-        lower.includes('is it worth') ||
-        lower.includes('what about'))
+    const asksAboutAddingFeature =
+      lower.includes('want to add') ||
+      lower.includes('also want to add') ||
+      lower.includes('can i add') ||
+      lower.includes('can we add') ||
+      lower.includes('should i add') ||
+      lower.includes('should we add') ||
+      lower.includes('should i include') ||
+      lower.includes('should we include') ||
+      lower.includes('should i implement') ||
+      lower.includes('should we implement') ||
+      lower.includes('what about adding') ||
+      lower.includes('is it worth adding') ||
+      lower.includes('is it good to add') ||
+      lower.includes('incorporate ') ||
+      lower.includes('feasibility of')
 
     if (
-      (isFeatureAdditionInquiry &&
+      asksAboutAddingFeature ||
+      (Boolean(context.currentProjectIdea) &&
+        !isBuildingWholeProject &&
         (lower.includes('facial recognition') ||
           lower.includes('face recognition') ||
           lower.includes('biometric') ||
-          lower.includes('blockchain'))) ||
-      ((lower.includes('can i add') ||
-        lower.includes('can we add') ||
-        lower.includes('want to add') ||
-        lower.includes('should i implement') ||
-        lower.includes('should we implement') ||
-        lower.includes('should i add') ||
-        lower.includes('should we add') ||
-        lower.includes('is it possible to add') ||
-        lower.includes('feasibility of') ||
-        lower.includes('what about adding')) &&
-        (lower.includes('task allocation') ||
           lower.includes('blockchain') ||
-          lower.includes('voice') ||
-          lower.includes('webrtc') ||
-          lower.includes('biometric') ||
-          lower.includes('ai') ||
-          lower.includes('feature')))
+          lower.includes('chatbot') ||
+          lower.includes('webrtc')))
     ) {
       return 'FEATURE_EVALUATION'
     }
@@ -242,7 +370,41 @@ export class IntentClassifier {
       return 'TECHNICAL_EXPLANATION'
     }
 
-    // 4b. Progression / Next Step (In Mode B or sequential review)
+    // 4a. Adaptive Conceptual Teaching (English + Hinglish/Kanglish question forms)
+    const isConceptQuestion =
+      lower.includes('semantic search') ||
+      lower.includes('embedding') ||
+      lower.includes('jwt') ||
+      lower.includes('database index') ||
+      lower.includes('cosine similarity')
+    const asksConceptualMeaning =
+      lower.includes("don't understand") ||
+      lower.includes('do not understand') ||
+      lower.includes('kya hai') ||
+      lower.includes('samjhao') ||
+      lower.includes('arthavagilla') ||
+      lower.includes('hege kelasa') ||
+      lower.includes('explain ') ||
+      lower.includes('what is ') ||
+      lower.includes('how does ')
+
+    if (
+      (isConceptQuestion && asksConceptualMeaning) ||
+      lower.includes("don't understand") ||
+      lower.includes('do not understand') ||
+      lower.includes('simpler explanation') ||
+      lower.includes('explain simply') ||
+      lower.includes('explain in simpler') ||
+      lower.includes('deeper technical detail') ||
+      lower.includes('more technical depth') ||
+      lower.includes('how can i use it in my project') ||
+      lower.includes('use it in my project repository') ||
+      (lower.includes('is it necessary') && Boolean(context.lastTopicCovered))
+    ) {
+      return 'CONCEPT_TEACHING'
+    }
+
+    // 4b. Progression / Next Step
     if (
       context.mode === 'CAMPUSPROJECTHUB_INTRO' &&
       (lower.includes('tell me more') ||
@@ -282,16 +444,53 @@ export class IntentClassifier {
       return 'CAMPUSPROJECTHUB_INTRO'
     }
 
-    // 6. Project Discovery (When student introduces an idea)
+    // 6. Constraint / Parameter Reply or Assumption Correction in active conversation
     if (
+      (context.currentProjectIdea || context.lastTopicCovered) &&
+      (/\b\d+\s*(?:members?|students?|weeks?|months?|people)\b/i.test(lower) ||
+        lower.includes('beginner') ||
+        lower.includes('intermediate') ||
+        lower.includes('advanced') ||
+        lower.includes('hardware') ||
+        lower.includes('laptop only') ||
+        lower.includes('no gpu') ||
+        lower.includes('dataset') ||
+        lower.includes('implement ') && lower.includes('first') ||
+        (context.currentDiscussionStage === 'STRUCTURED_COMPARISON_PRESENTED' &&
+          (lower.includes('task allocation') || lower.includes('progress prediction') || lower.includes('start with '))) ||
+        lower.startsWith('correction:') ||
+        lower.includes('update constraints') ||
+        lower.includes('switch to kannada') ||
+        lower.includes('switch language') ||
+        lower.includes('switch to hindi') ||
+        lower.includes('switch to english')) &&
+      !lower.includes('want to build') &&
+      !lower.includes('want to develop')
+    ) {
+      return 'CLARIFICATION_OR_PARAM'
+    }
+
+    // 7. Project Discovery (Full pitch, incomplete pitch, bare title, or tech-only probe)
+    const techOnly = ideaAnalyzer.isTechnologyOnlyInput(message)
+    const looksLikeQuestion =
+      lower.includes('?') ||
+      lower.startsWith('what ') ||
+      lower.startsWith('how ') ||
+      lower.startsWith('why ') ||
+      lower.startsWith('explain ')
+    const isGreeting = ['hi', 'hello', 'hey'].includes(lower)
+
+    if (
+      techOnly.isTechOnly ||
       lower.includes('i have a mini-project idea') ||
       lower.includes('i have a project idea') ||
+      lower.includes('i have idea') ||
+      lower.includes('have an idea') ||
+      lower.includes('idea for ') ||
       lower.includes('have a mini-project idea') ||
       lower.includes('have a project idea') ||
       lower.includes('mini-project idea') ||
-      lower.includes('project idea about') ||
-      lower.includes('project idea on') ||
-      lower.includes('idea about a project') ||
+      lower.includes('project idea') ||
       lower.includes('idea about') ||
       lower.includes('want to develop') ||
       lower.includes('want to build') ||
@@ -300,15 +499,15 @@ export class IntentClassifier {
       lower.includes('is developing') ||
       lower.includes('building') ||
       lower.includes('developing') ||
-      lower.includes('my project idea is') ||
-      lower.includes('our project idea is') ||
       lower.includes('planning to create') ||
       lower.includes('planning to build') ||
       lower.includes('college project management') ||
       lower.includes('project management system') ||
       lower.includes('attendance') ||
-      lower.includes('smart attendance') ||
+      lower.includes('healthcare') ||
       lower.includes('hospital management') ||
+      /\b(?:hostel|hostl|complaint|grievance|warden|parking|portal|tracking system)\b/i.test(lower) ||
+      (!looksLikeQuestion && !isGreeting && !context.currentProjectIdea && lower.split(/\s+/).length >= 2) ||
       (context.currentProjectIdea && (lower.includes('my idea') || lower.includes('our project')))
     ) {
       return 'PROJECT_DISCOVERY'

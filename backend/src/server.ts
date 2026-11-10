@@ -1,11 +1,14 @@
 import { createApp } from './app.js'
-import { config } from './config/env.js'
-import { connectDatabase } from './config/db.js'
+import { config, validateSecurityConfig } from './config/env.js'
+import { connectDatabase, disconnectDatabase } from './config/db.js'
 import { seedRepository } from './modules/repository/repository.seeder.js'
 import { seedMentorProfiles } from './modules/connections/connection.model.js'
 import { seedCollegeTemplates } from './modules/proposals/template.model.js'
 
 async function bootstrap() {
+  // Fail fast if production security invariants are violated
+  validateSecurityConfig()
+
   // Connect to Database (or initialize explicit non-production fallback store)
   await connectDatabase()
 
@@ -24,7 +27,8 @@ async function bootstrap() {
   // Graceful shutdown handling
   const shutdown = async () => {
     console.log('[CampusProjectHub Backend] Shutting down server gracefully...')
-    server.close(() => {
+    server.close(async () => {
+      await disconnectDatabase()
       console.log('[CampusProjectHub Backend] Closed out remaining connections.')
       process.exit(0)
     })

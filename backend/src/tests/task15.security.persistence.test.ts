@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import http from 'node:http'
 import mongoose from 'mongoose'
 import { createApp } from '../app.js'
-import { config } from '../config/env.js'
+import { config, validateSecurityConfig } from '../config/env.js'
 import { connectDatabase, disconnectDatabase } from '../config/db.js'
 import { seedRepository } from '../modules/repository/repository.seeder.js'
 import { seedMentorProfiles } from '../modules/connections/connection.model.js'
@@ -652,5 +652,50 @@ describe('TASK 15 — MongoDB Persistence & Authentication Hardening Integration
     assert.equal(recoveredConvRes.status, 200)
     const recoveredJson: any = await recoveredConvRes.json()
     assert.ok(recoveredJson.data.some((c: any) => c.id === persistedConvId))
+  })
+
+  it('9. Verifies HTTP security headers, Zod 400 error hygiene, production secret guard, and baseline latency', async () => {
+    const startMs = Date.now()
+    const healthRes = await fetch(`${baseUrl}/health`)
+    const latencyMs = Date.now() - startMs
+    assert.equal(healthRes.status, 200)
+    assert.ok(latencyMs < 500, `Expected /health under 500ms, got ${latencyMs}ms`)
+    assert.equal(healthRes.headers.get('x-powered-by'), null)
+    assert.equal(healthRes.headers.get('x-content-type-options'), 'nosniff')
+    assert.equal(healthRes.headers.get('x-frame-options'), 'DENY')
+    assert.equal(healthRes.headers.get('referrer-policy'), 'no-referrer')
+
+    // Zod validation errors return clean 400 VALIDATION_ERROR without stack trace leak
+    const invalidLogin = await fetch(`${baseUrl}/api/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: 'not-an-email', password: '' }),
+    })
+    assert.equal(invalidLogin.status, 400)
+    const invalidJson: any = await invalidLogin.json()
+    assert.equal(invalidJson.error.code, 'VALIDATION_ERROR')
+    assert.equal(invalidJson.stack, undefined)
+
+    // Production guard rejects placeholder/weak JWT_SECRET and ALLOW_INMEMORY_FALLBACK=true
+    const prevNodeEnv = config.NODE_ENV
+    const prevSecret = config.JWT_SECRET
+    const prevFallback = config.ALLOW_INMEMORY_FALLBACK
+    try {
+      config.NODE_ENV = 'production'
+      config.JWT_SECRET = 'campusprojecthub-academic-jwt-secret-dev-2026'
+      config.ALLOW_INMEMORY_FALLBACK = 'false'
+      assert.throws(() => validateSecurityConfig(), /JWT_SECRET/)
+
+      config.JWT_SECRET = 'valid-production-random-secret-at-least-32-chars-long'
+      config.ALLOW_INMEMORY_FALLBACK = 'true'
+      assert.throws(() => validateSecurityConfig(), /ALLOW_INMEMORY_FALLBACK/)
+
+      config.ALLOW_INMEMORY_FALLBACK = 'false'
+      assert.doesNotThrow(() => validateSecurityConfig())
+    } finally {
+      config.NODE_ENV = prevNodeEnv
+      config.JWT_SECRET = prevSecret
+      config.ALLOW_INMEMORY_FALLBACK = prevFallback
+    }
   })
 })

@@ -203,7 +203,7 @@ describe('AI Project Mentor Backend API Test Suite', () => {
       body: JSON.stringify({ content: '   ' }),
     })
 
-    assert.strictEqual(badRes.status, 500)
+    assert.strictEqual(badRes.status, 400) // Zod validation failure cleanly returns 400 Bad Request
   })
 
   test('8. PATCH and DELETE conversation', async () => {

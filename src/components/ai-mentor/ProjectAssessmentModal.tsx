@@ -86,6 +86,15 @@ export const ProjectAssessmentModal: React.FC<ProjectAssessmentModalProps> = ({
     }
   }, [isOpen, initialProjectTitle, initialProblemStatement, currentConstraints, initialFeatures])
 
+  React.useEffect(() => {
+    if (!isOpen) return
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose()
+    }
+    window.addEventListener('keydown', handleKey)
+    return () => window.removeEventListener('keydown', handleKey)
+  }, [isOpen, onClose])
+
   if (!isOpen) return null
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -124,7 +133,12 @@ export const ProjectAssessmentModal: React.FC<ProjectAssessmentModalProps> = ({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs">
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="project-assessment-modal-title"
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs"
+    >
       <div className="relative w-full max-w-2xl bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden flex flex-col max-h-[90vh]">
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 bg-slate-900 text-white border-b border-slate-800">
@@ -133,15 +147,19 @@ export const ProjectAssessmentModal: React.FC<ProjectAssessmentModalProps> = ({
               <Sparkles className="w-5 h-5" />
             </div>
             <div>
-              <h3 className="font-bold text-base text-white">Project Assessment & Constraints Audit</h3>
+              <h3 id="project-assessment-modal-title" className="font-bold text-base text-white">
+                Project Assessment & Constraints Audit
+              </h3>
               <p className="text-xs text-slate-400">
                 Populated with known details; adjust parameters to test feasibility
               </p>
             </div>
           </div>
           <button
+            type="button"
             onClick={onClose}
-            className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+            aria-label="Close project assessment modal"
+            className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6658FF]"
           >
             <X className="w-5 h-5" />
           </button>

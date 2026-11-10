@@ -286,4 +286,100 @@ export const aiMentorApiService = {
       callbacks.onError(err)
     }
   },
+
+  /**
+   * Fetch authenticated student's optional personalization learning profile
+   */
+  async getLearningProfile(): Promise<any | null> {
+    try {
+      const res = await fetch(`${getBase()}/learning-profile`, {
+        headers: getApiHeaders({}, false),
+      })
+      if (!res.ok) return null
+      const json = await res.json()
+      return json.data || null
+    } catch {
+      return null
+    }
+  },
+
+  /**
+   * Update authenticated student's personalization preferences & constraints
+   */
+  async updateLearningProfile(updates: {
+    explanationLevel?: 'beginner' | 'intermediate' | 'advanced'
+    explanationStyle?: 'step_by_step' | 'concise' | 'architecture_first' | 'example_driven'
+    preferredLanguage?: 'auto' | 'en' | 'kn' | 'hi'
+    defaultConstraints?: {
+      teamSize?: number
+      durationWeeks?: number
+    }
+  }): Promise<any | null> {
+    try {
+      const res = await fetch(`${getBase()}/learning-profile`, {
+        method: 'PATCH',
+        headers: getApiHeaders(),
+        body: JSON.stringify(updates),
+      })
+      if (!res.ok) return null
+      const json = await res.json()
+      return json.data || null
+    } catch {
+      return null
+    }
+  },
+
+  /**
+   * Optional lightweight student feedback on an AI Mentor message
+   */
+  async submitMessageFeedback(
+    conversationId: string,
+    messageId: string,
+    payload: {
+      rating: 'helpful' | 'needs_improvement'
+      category:
+        | 'HELPFUL_RESPONSE'
+        | 'INCORRECT_INFORMATION'
+        | 'IRRELEVANT_RESPONSE'
+        | 'CONFUSING_EXPLANATION'
+        | 'MISSING_PROJECT_INFO'
+      comment?: string
+    }
+  ): Promise<any | null> {
+    try {
+      const res = await fetch(
+        `${getBase()}/conversations/${conversationId}/messages/${messageId}/feedback`,
+        {
+          method: 'POST',
+          headers: getApiHeaders(),
+          body: JSON.stringify(payload),
+        }
+      )
+      if (!res.ok) return null
+      const json = await res.json()
+      return json.data || null
+    } catch {
+      return null
+    }
+  },
+
+  /**
+   * Load student's saved feedback entries for a conversation
+   */
+  async getConversationFeedback(conversationId: string): Promise<Record<string, any>> {
+    try {
+      const res = await fetch(`${getBase()}/conversations/${conversationId}/feedback`, {
+        headers: getApiHeaders({}, false),
+      })
+      if (!res.ok) return {}
+      const json = await res.json()
+      const map: Record<string, any> = {}
+      for (const item of json.data || []) {
+        map[item.messageId] = item
+      }
+      return map
+    } catch {
+      return {}
+    }
+  },
 }

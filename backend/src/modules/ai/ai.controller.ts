@@ -4,6 +4,20 @@ import { conversationService } from './conversation.service.js'
 import { aiService } from './ai.service.js'
 import { knowledgeService } from './knowledge/knowledge.service.js'
 import { contextManager } from './conversational-engine/context.manager.js'
+import { LearningProfileRepository } from './personalization/learningProfile.model.js'
+import { MessageFeedbackRepository } from './messageFeedback.model.js'
+
+const messageFeedbackSchema = z.object({
+  rating: z.enum(['helpful', 'needs_improvement']),
+  category: z.enum([
+    'HELPFUL_RESPONSE',
+    'INCORRECT_INFORMATION',
+    'IRRELEVANT_RESPONSE',
+    'CONFUSING_EXPLANATION',
+    'MISSING_PROJECT_INFO',
+  ]),
+  comment: z.string().trim().max(300).optional(),
+})
 
 // Input validation schemas
 const createConversationSchema = z.object({
@@ -17,6 +31,43 @@ const renameConversationSchema = z.object({
 const sendMessageSchema = z.object({
   content: z.string().trim().min(1, 'Message cannot be empty').max(4000, 'Message exceeds 4000 characters limit'),
   stream: z.boolean().optional().default(true),
+})
+
+const updateLearningProfileSchema = z.object({
+  explanationLevel: z.enum(['beginner', 'intermediate', 'advanced']).optional(),
+  programmingExperience: z.enum(['none', 'basic', 'moderate', 'strong']).optional(),
+  knownLanguages: z.array(z.string().trim().max(40)).max(25).optional(),
+  technicalInterests: z.array(z.string().trim().max(60)).max(25).optional(),
+  familiarTools: z.array(z.string().trim().max(40)).max(30).optional(),
+  projectExperience: z.enum(['first_project', 'one_or_two', 'multiple']).optional(),
+  preferredLanguage: z.enum(['auto', 'en', 'kn', 'hi']).optional(),
+  explanationStyle: z
+    .enum(['step_by_step', 'concise', 'architecture_first', 'example_driven'])
+    .optional(),
+  defaultConstraints: z
+    .object({
+      teamSize: z.number().int().min(1).max(12).optional(),
+      durationWeeks: z.number().int().min(1).max(52).optional(),
+      hardwareAvailable: z.string().trim().max(120).optional(),
+      budget: z.string().trim().max(120).optional(),
+      academicRequirement: z.string().trim().max(120).optional(),
+      availableDatasets: z.string().trim().max(120).optional(),
+    })
+    .optional(),
+})
+
+const correctContextSchema = z.object({
+  currentProjectIdea: z.string().trim().max(150).optional(),
+  technicalExperience: z.enum(['beginner', 'intermediate', 'advanced']).optional(),
+  teamSize: z.number().int().min(1).max(12).optional(),
+  developmentWeeks: z.number().int().min(1).max(52).optional(),
+  budget: z.string().trim().max(120).optional(),
+  hardwareRequirements: z.string().trim().max(120).optional(),
+  availableDatasets: z.string().trim().max(120).optional(),
+  academicRequirements: z.string().trim().max(120).optional(),
+  languagePreference: z.enum(['auto', 'en', 'kn', 'hi']).optional(),
+  explanationStyle: z.enum(['step_by_step', 'concise', 'architecture_first', 'example_driven']).optional(),
+  preferredTechnologies: z.array(z.string().trim().max(40)).max(20).optional(),
 })
 
 export const AIController = {
@@ -94,6 +145,89 @@ export const AIController = {
       res.json({
         success: true,
         data: context,
+      })
+    } catch (err) {
+      next(err)
+    }
+  },
+
+  /**
+   * PATCH /api/ai/conversations/:conversationId/context
+   * Allows student owner to correct remembered assumptions
+   */
+  async updateConversationContext(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const ownerId = req.user!.id
+      const conversationId = String(req.params.conversationId)
+      const parsed = correctContextSchema.parse(req.body || {})
+      const updated = await contextManager.correctContext(conversationId, ownerId, parsed)
+      res.json({
+        success: true,
+        data: updated,
+      })
+    } catch (err) {
+      next(err)
+    }
+  },
+
+  /**
+   * DELETE /api/ai/conversations/:conversationId/context
+   * Resets conversation context cleanly for the authenticated owner
+   */
+  async clearConversationContext(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const ownerId = req.user!.id
+      const conversationId = String(req.params.conversationId)
+      const reset = await contextManager.clearContext(conversationId, ownerId)
+      res.json({
+        success: true,
+        data: reset,
+      })
+    } catch (err) {
+      next(err)
+    }
+  },
+
+  /**
+   * GET /api/ai/learning-profile
+   */
+  async getLearningProfile(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const profile = await LearningProfileRepository.getOrCreateForUser(req.user!.id)
+      res.json({
+        success: true,
+        data: profile,
+      })
+    } catch (err) {
+      next(err)
+    }
+  },
+
+  /**
+   * PATCH /api/ai/learning-profile
+   */
+  async updateLearningProfile(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const parsed = updateLearningProfileSchema.parse(req.body || {})
+      const updated = await LearningProfileRepository.updateForUser(req.user!.id, parsed)
+      res.json({
+        success: true,
+        data: updated,
+      })
+    } catch (err) {
+      next(err)
+    }
+  },
+
+  /**
+   * DELETE /api/ai/learning-profile
+   */
+  async resetLearningProfile(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const reset = await LearningProfileRepository.resetForUser(req.user!.id)
+      res.json({
+        success: true,
+        data: reset,
       })
     } catch (err) {
       next(err)
@@ -283,6 +417,54 @@ export const AIController = {
           docId,
           content,
         },
+      })
+    } catch (err) {
+      next(err)
+    }
+  },
+
+  /**
+   * POST /api/ai/conversations/:conversationId/messages/:messageId/feedback
+   * Optional lightweight student feedback (not automatically used as training data)
+   */
+  async submitMessageFeedback(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const ownerId = req.user!.id
+      const conversationId = String(req.params.conversationId)
+      const messageId = String(req.params.messageId)
+      await conversationService.getConversation(conversationId, ownerId)
+      const parsed = messageFeedbackSchema.parse(req.body)
+
+      const saved = await MessageFeedbackRepository.upsert({
+        conversationId,
+        messageId,
+        ownerId,
+        rating: parsed.rating,
+        category: parsed.category,
+        comment: parsed.comment,
+      })
+
+      res.status(201).json({
+        success: true,
+        data: saved,
+      })
+    } catch (err) {
+      next(err)
+    }
+  },
+
+  /**
+   * GET /api/ai/conversations/:conversationId/feedback
+   */
+  async listConversationFeedback(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const ownerId = req.user!.id
+      const conversationId = String(req.params.conversationId)
+      await conversationService.getConversation(conversationId, ownerId)
+      const list = await MessageFeedbackRepository.listByConversation(conversationId, ownerId)
+      res.json({
+        success: true,
+        data: list,
       })
     } catch (err) {
       next(err)

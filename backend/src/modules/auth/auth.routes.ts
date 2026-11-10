@@ -1,12 +1,13 @@
 import { Router } from 'express'
 import { authController } from './auth.controller.js'
 import { authenticate, requireRole } from '../../middleware/auth.middleware.js'
+import { authRateLimiter } from '../../middleware/rateLimit.js'
 
 const router = Router()
 
-router.post('/register', authController.register)
-router.post('/login', authController.login)
-router.post('/bootstrap-admin', authController.bootstrapAdmin)
+router.post('/register', authRateLimiter, authController.register)
+router.post('/login', authRateLimiter, authController.login)
+router.post('/bootstrap-admin', authRateLimiter, authController.bootstrapAdmin)
 
 router.post('/logout', authenticate, authController.logout)
 router.get('/me', authenticate, authController.me)

@@ -19,10 +19,32 @@ import {
 import type { ChatMessage as ChatMessageType, AudioPlaybackSpeed } from '../../types/aiMentor'
 import { voiceService } from '../../services/voiceService'
 
+export type FeedbackCategory =
+  | 'HELPFUL_RESPONSE'
+  | 'INCORRECT_INFORMATION'
+  | 'IRRELEVANT_RESPONSE'
+  | 'CONFUSING_EXPLANATION'
+  | 'MISSING_PROJECT_INFO'
+
+export interface MessageFeedbackPayload {
+  rating: 'helpful' | 'needs_improvement'
+  category: FeedbackCategory
+  comment?: string
+}
+
+export interface StoredFeedbackState {
+  rating: 'helpful' | 'needs_improvement'
+  category: FeedbackCategory
+  comment?: string
+}
+
 interface ChatMessageProps {
   message: ChatMessageType
   onSelectFollowUp?: (prompt: string) => void
   onRetry?: (message: ChatMessageType) => void
+  isOfflineDemo?: boolean
+  savedFeedback?: StoredFeedbackState
+  onSubmitFeedback?: (messageId: string, payload: MessageFeedbackPayload) => Promise<void> | void
 }
 
 // Simple custom markdown renderer tailored for clean academic responses
@@ -142,6 +164,16 @@ const renderMarkdownContent = (content: string) => {
       continue
     }
 
+    // Callout / Blockquote lines
+    if (line.trim().startsWith('> ')) {
+      elements.push(
+        <blockquote key={`bq-${i}`} className="my-2 pl-3 py-1.5 pr-2 border-l-2 border-[#6658FF] bg-slate-50 rounded-r-lg text-xs sm:text-sm text-slate-700 leading-relaxed">
+          {renderInlineFormatting(line.trim().substring(2))}
+        </blockquote>
+      )
+      continue
+    }
+
     // Bullet list items
     if (line.trim().startsWith('* ') || line.trim().startsWith('- ')) {
       elements.push(
@@ -187,11 +219,11 @@ const renderMarkdownContent = (content: string) => {
   return elements
 }
 
-// Inline formatting parser for **bold** and `code`
+// Inline formatting parser for [links](url), **bold**, *italic*, and `code`
 const renderInlineFormatting = (text: string) => {
   const parts: React.ReactNode[] = []
   let cursor = 0
-  const regex = /(\*\*[^*]+\*\*|`[^`]+`|\*[^*]+\*)/g
+  const regex = /(\[[^\]]+\]\([^)]+\)|\*\*[^*]+\*\*|`[^`]+`|\*[^*]+\*)/g
   let match: RegExpExecArray | null
 
   while ((match = regex.exec(text)) !== null) {
@@ -199,7 +231,30 @@ const renderInlineFormatting = (text: string) => {
       parts.push(text.substring(cursor, match.index))
     }
     const token = match[0]
-    if (token.startsWith('**') && token.endsWith('**')) {
+    if (token.startsWith('[')) {
+      const linkMatch = token.match(/^\[([^\]]+)\]\(([^)]+)\)$/)
+      if (linkMatch) {
+        const [, label, href] = linkMatch
+        const isSafeInternal = href.startsWith('/')
+        const isSafeExternal = href.startsWith('https://') || href.startsWith('http://')
+        if (isSafeInternal || isSafeExternal) {
+          parts.push(
+            <a
+              key={match.index}
+              href={href}
+              {...(isSafeExternal ? { target: '_blank', rel: 'noopener noreferrer' } : {})}
+              className="text-[#6658FF] hover:text-[#4F46E5] underline underline-offset-2 font-semibold"
+            >
+              {label}
+            </a>
+          )
+        } else {
+          parts.push(label)
+        }
+      } else {
+        parts.push(token)
+      }
+    } else if (token.startsWith('**') && token.endsWith('**')) {
       parts.push(
         <strong key={match.index} className="font-semibold text-slate-900">
           {token.slice(2, -2)}
@@ -270,16 +325,71 @@ const CodeBlockView: React.FC<{ code: string; language: string }> = ({ code, lan
   )
 }
 
-export const ChatMessage: React.FC<ChatMessageProps> = ({ message, onSelectFollowUp, onRetry }) => {
+export const ChatMessage: React.FC<ChatMessageProps> = ({
+  message,
+  onSelectFollowUp,
+  onRetry,
+  isOfflineDemo = false,
+  savedFeedback,
+  onSubmitFeedback,
+}) => {
   const [copiedResponse, setCopiedResponse] = useState(false)
-  const [feedback, setFeedback] = useState<'liked' | 'disliked' | null>(null)
+  const [localFeedback, setLocalFeedback] = useState<'liked' | 'disliked' | null>(null)
+  const [showFeedbackForm, setShowFeedbackForm] = useState(false)
+  const [feedbackCategory, setFeedbackCategory] = useState<FeedbackCategory>(
+    savedFeedback?.category && savedFeedback.category !== 'HELPFUL_RESPONSE'
+      ? savedFeedback.category
+      : 'CONFUSING_EXPLANATION'
+  )
+  const [feedbackComment, setFeedbackComment] = useState(savedFeedback?.comment || '')
+  const [feedbackSavedNotice, setFeedbackSavedNotice] = useState(false)
   const [isPlayingAudio, setIsPlayingAudio] = useState(false)
   const [isPausedAudio, setIsPausedAudio] = useState(false)
   const [isLoadingAudio, setIsLoadingAudio] = useState(false)
   const [audioError, setAudioError] = useState<string | null>(null)
   const [playbackSpeed, setPlaybackSpeed] = useState<AudioPlaybackSpeed>(1)
 
+  const feedback: 'liked' | 'disliked' | null =
+    localFeedback ??
+    (savedFeedback?.rating === 'helpful'
+      ? 'liked'
+      : savedFeedback?.rating === 'needs_improvement'
+      ? 'disliked'
+      : null)
+
   const isAssistant = message.role === 'assistant'
+
+  const handleHelpfulClick = async () => {
+    setLocalFeedback('liked')
+    setShowFeedbackForm(false)
+    if (onSubmitFeedback) {
+      await onSubmitFeedback(message.id, {
+        rating: 'helpful',
+        category: 'HELPFUL_RESPONSE',
+      })
+      setFeedbackSavedNotice(true)
+      setTimeout(() => setFeedbackSavedNotice(false), 2000)
+    }
+  }
+
+  const handleNeedsImprovementClick = async () => {
+    setLocalFeedback('disliked')
+    setShowFeedbackForm((prev) => !prev)
+  }
+
+  const handleSubmitNegativeFeedback = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (onSubmitFeedback) {
+      await onSubmitFeedback(message.id, {
+        rating: 'needs_improvement',
+        category: feedbackCategory,
+        comment: feedbackComment.trim() || undefined,
+      })
+    }
+    setShowFeedbackForm(false)
+    setFeedbackSavedNotice(true)
+    setTimeout(() => setFeedbackSavedNotice(false), 2500)
+  }
 
   // Clean audio resources if this message unmounts
   useEffect(() => {
@@ -399,16 +509,21 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message, onSelectFollo
               <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
                 Academic Guide
               </span>
-              <span className="hidden sm:inline-flex px-1.5 py-0.5 rounded text-[9px] font-mono uppercase bg-slate-100 text-slate-500">
-                Demo Mode
-              </span>
+              {isOfflineDemo && (
+                <span className="hidden sm:inline-flex px-1.5 py-0.5 rounded text-[9px] font-mono uppercase bg-amber-50 text-amber-700 border border-amber-200">
+                  Offline Demo
+                </span>
+              )}
             </div>
-            <span className="text-[10px] text-slate-400">{message.timestamp}</span>
+            <span className="text-[10px] text-slate-500">{message.timestamp}</span>
           </div>
 
           {/* Formatted Markdown Body */}
           {message.status === 'failed' ? (
-            <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs flex items-center justify-between gap-3">
+            <div
+              role="alert"
+              className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs flex items-center justify-between gap-3"
+            >
               <div className="flex items-center gap-2">
                 <AlertTriangle className="w-4 h-4 text-rose-500 shrink-0" />
                 <span>Failed to complete generation. Connection or provider timeout occurred.</span>
@@ -417,7 +532,8 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message, onSelectFollo
                 <button
                   type="button"
                   onClick={() => onRetry(message)}
-                  className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-rose-600 hover:bg-rose-700 text-white font-semibold text-[11px] transition-colors cursor-pointer shrink-0"
+                  aria-label="Retry failed mentor response"
+                  className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-rose-600 hover:bg-rose-700 text-white font-semibold text-[11px] transition-colors cursor-pointer shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500"
                 >
                   <RotateCcw className="w-3 h-3" />
                   <span>Retry</span>
@@ -428,12 +544,14 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message, onSelectFollo
             <div className="prose-slate">{renderMarkdownContent(message.content)}</div>
           )}
 
-          {/* Action Bar (Copy, Feedback, Demonstration Notice) */}
+          {/* Action Bar (Copy, Feedback, Audio) */}
           <div className="mt-4 pt-3 border-t border-slate-100 flex flex-wrap items-center justify-between gap-2 text-xs">
-            <div className="flex items-center gap-1.5">
+            <div className="flex items-center gap-1.5 flex-wrap">
               <button
+                type="button"
                 onClick={handleCopyResponse}
-                className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-colors cursor-pointer text-xs font-medium"
+                aria-label="Copy entire mentor response"
+                className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-colors cursor-pointer text-xs font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6658FF]"
                 title="Copy entire response"
               >
                 {copiedResponse ? (
@@ -449,30 +567,42 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message, onSelectFollo
                 )}
               </button>
 
-              <div className="h-3 w-px bg-slate-200 mx-1" />
+              <div className="h-3 w-px bg-slate-200 mx-1" aria-hidden="true" />
 
               <button
-                onClick={() => setFeedback(feedback === 'liked' ? null : 'liked')}
-                className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
+                type="button"
+                onClick={handleHelpfulClick}
+                aria-label="Mark response as helpful"
+                aria-pressed={feedback === 'liked'}
+                className={`p-1.5 rounded-lg transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 ${
                   feedback === 'liked'
-                    ? 'text-emerald-600 bg-emerald-50'
-                    : 'text-slate-400 hover:text-slate-700 hover:bg-slate-100'
+                    ? 'text-emerald-700 bg-emerald-50'
+                    : 'text-slate-500 hover:text-slate-700 hover:bg-slate-100'
                 }`}
-                title="Helpful guidance"
+                title="Helpful response"
               >
                 <ThumbsUp className="w-3.5 h-3.5" />
               </button>
               <button
-                onClick={() => setFeedback(feedback === 'disliked' ? null : 'disliked')}
-                className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
+                type="button"
+                onClick={handleNeedsImprovementClick}
+                aria-label="Report issue with response (optional feedback)"
+                aria-pressed={feedback === 'disliked'}
+                aria-expanded={showFeedbackForm}
+                className={`p-1.5 rounded-lg transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500 ${
                   feedback === 'disliked'
-                    ? 'text-rose-600 bg-rose-50'
-                    : 'text-slate-400 hover:text-slate-700 hover:bg-slate-100'
+                    ? 'text-rose-700 bg-rose-50'
+                    : 'text-slate-500 hover:text-slate-700 hover:bg-slate-100'
                 }`}
-                title="Needs improvement"
+                title="Report response issue (optional)"
               >
                 <ThumbsDown className="w-3.5 h-3.5" />
               </button>
+              {feedbackSavedNotice && (
+                <span className="text-[11px] font-medium text-emerald-700 ml-1" role="status">
+                  Feedback saved
+                </span>
+              )}
 
               <div className="h-3 w-px bg-slate-200 mx-1" />
 
@@ -533,6 +663,7 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message, onSelectFollo
                     <button
                       type="button"
                       onClick={handleStopAudio}
+                      aria-label="Stop audio playback"
                       className="p-1 rounded text-slate-500 hover:text-slate-800 hover:bg-slate-200 cursor-pointer"
                       title="Stop audio playback"
                     >
@@ -541,6 +672,7 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message, onSelectFollo
                     <button
                       type="button"
                       onClick={handleReplayAudio}
+                      aria-label="Replay audio from start"
                       className="p-1 rounded text-slate-500 hover:text-slate-800 hover:bg-slate-200 cursor-pointer"
                       title="Replay from start"
                     >
@@ -553,6 +685,7 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message, onSelectFollo
                 <select
                   value={playbackSpeed}
                   onChange={(e) => handleChangeSpeed(parseFloat(e.target.value) as AudioPlaybackSpeed)}
+                  aria-label="Audio playback speed"
                   className="text-[10px] font-bold text-slate-600 bg-transparent py-0.5 px-1 rounded hover:bg-slate-200 cursor-pointer focus:outline-none"
                   title="Playback speed"
                 >
@@ -564,10 +697,77 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message, onSelectFollo
               </div>
             </div>
 
-            <span className="text-[11px] text-slate-400 italic">
-              Demonstration response • Academic capstone model
+            <span className="text-[11px] text-slate-500 italic">
+              {isOfflineDemo
+                ? 'Offline Demo Preview • Connect backend for live repository records'
+                : 'Repository-grounded guidance • Verify citations with your faculty guide'}
             </span>
           </div>
+
+          {/* Optional Lightweight Student Feedback Drawer */}
+          {showFeedbackForm && (
+            <form
+              onSubmit={handleSubmitNegativeFeedback}
+              aria-label="Optional response feedback form"
+              className="mt-3 p-3 rounded-xl bg-slate-50 border border-slate-200 space-y-2.5 text-xs"
+            >
+              <div className="flex items-center justify-between gap-2">
+                <span className="font-semibold text-slate-800">What could be improved? (Optional)</span>
+                <button
+                  type="button"
+                  onClick={() => setShowFeedbackForm(false)}
+                  className="text-[11px] font-medium text-slate-500 hover:text-slate-800 cursor-pointer"
+                >
+                  Skip
+                </button>
+              </div>
+              <div className="flex flex-wrap gap-1.5" role="radiogroup" aria-label="Issue category">
+                {(
+                  [
+                    ['INCORRECT_INFORMATION', 'Incorrect information'],
+                    ['IRRELEVANT_RESPONSE', 'Irrelevant response'],
+                    ['CONFUSING_EXPLANATION', 'Confusing explanation'],
+                    ['MISSING_PROJECT_INFO', 'Missing project information'],
+                  ] as const
+                ).map(([cat, label]) => (
+                  <button
+                    key={cat}
+                    type="button"
+                    role="radio"
+                    aria-checked={feedbackCategory === cat}
+                    onClick={() => setFeedbackCategory(cat)}
+                    className={`px-2.5 py-1 rounded-lg border text-[11px] font-medium transition-colors cursor-pointer ${
+                      feedbackCategory === cat
+                        ? 'bg-[#6658FF] text-white border-[#6658FF]'
+                        : 'bg-white text-slate-700 border-slate-200 hover:border-[#6658FF]/40'
+                    }`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+              <div className="flex flex-col sm:flex-row gap-2">
+                <input
+                  type="text"
+                  maxLength={300}
+                  value={feedbackComment}
+                  onChange={(e) => setFeedbackComment(e.target.value)}
+                  placeholder="Optional note (no personal info needed)..."
+                  aria-label="Optional feedback note"
+                  className="flex-1 px-2.5 py-1.5 rounded-lg bg-white border border-slate-200 text-xs text-slate-800 focus:outline-none focus:border-[#6658FF]"
+                />
+                <button
+                  type="submit"
+                  className="px-3 py-1.5 rounded-lg bg-[#6658FF] hover:bg-[#5546FF] text-white font-semibold text-[11px] cursor-pointer shrink-0"
+                >
+                  Submit Feedback
+                </button>
+              </div>
+              <p className="text-[10px] text-slate-500">
+                Optional feedback helps reviewers improve clarity; it is never automatically treated as verified training data.
+              </p>
+            </form>
+          )}
 
           {/* Suggested Follow-Up Prompts */}
           {message.suggestedFollowUps && message.suggestedFollowUps.length > 0 && (

@@ -1,3 +1,5 @@
+import type { StructuredIdeaAnalysis } from './idea.analyzer.js'
+
 export type ConversationMode =
   | 'PROJECT_DISCOVERY'
   | 'CAMPUSPROJECTHUB_INTRO'
@@ -5,6 +7,7 @@ export type ConversationMode =
 
 export type StudentIntent =
   | 'PROJECT_DISCOVERY'
+  | 'IDEA_CHANGE_PIVOT'
   | 'CAMPUSPROJECTHUB_INTRO'
   | 'FEATURE_EVALUATION'
   | 'COMPARISON_INQUIRY'
@@ -20,9 +23,38 @@ export type StudentIntent =
   | 'DOCUMENTATION_INQUIRY'
   | 'COLLEGE_SCOPE_AFFIRMATION'
   | 'FACULTY_EXPLANATION'
+  | 'REPOSITORY_BATCH_INQUIRY'
+  | 'REPOSITORY_TECH_INQUIRY'
+  | 'REPOSITORY_IMPROVEMENTS_INQUIRY'
+  | 'REPOSITORY_ORIGINALITY_INQUIRY'
+  | 'RESTRICTED_INFO_INQUIRY'
+  | 'CONCEPT_TEACHING'
+  | 'RETURN_TO_PRIOR_PROJECT'
+  | 'MULTI_PROJECT_COMPARISON'
   | 'GENERAL_MENTORING'
 
 export type ExperienceLevel = 'beginner' | 'intermediate' | 'advanced'
+
+export interface MatchedRepoSummary {
+  projectId?: string
+  sourceUrl?: string
+  title: string
+  academicYear: string
+  batch?: string
+  semester?: string
+  department: string
+  similarityClassification: string
+  academicClassification?: string
+  overlapScore: number
+  confirmedDetails: string[]
+  missingDetails: string[]
+  authors?: Array<{
+    studentId?: string
+    name: string
+    role?: string
+    isAvailableForMentoring: boolean
+  }>
+}
 
 export interface IConversationContext {
   conversationId: string
@@ -35,7 +67,16 @@ export interface IConversationContext {
   rejectedRecommendations: string[]
   technicalExperience: ExperienceLevel
   teamSize?: number
+  developmentWeeks?: number
   availableDevelopmentTime?: string
+  budget?: string
+  hardwareRequirements?: string
+  availableDatasets?: string
+  academicRequirements?: string
+  explanationStyle?: string
+  explicitlyProvidedConstraints?: string[]
+  askedQuestionKeys?: string[]
+  unansweredQuestions?: string[]
   preferredTechnologies: string[]
   languagePreference?: string
   currentDiscussionStage: string
@@ -44,23 +85,26 @@ export interface IConversationContext {
   introSectionIndex: number // 0 to 14 for 15 progressive sections of Mode B
   activeEvaluationId?: string
   activeProposalId?: string
-  matchedRepositoryProject?: {
-    projectId?: string
-    sourceUrl?: string
+  activeComparisonSessionId?: string
+  activeIdeaAnalysis?: StructuredIdeaAnalysis
+  matchedRepositoryProject?: MatchedRepoSummary
+  matchedRepositoryProjects?: MatchedRepoSummary[]
+  previousProjectIdeas?: Array<{
     title: string
-    academicYear: string
-    department: string
-    similarityClassification: string
-    overlapScore: number
-    confirmedDetails: string[]
-    missingDetails: string[]
-    authors?: Array<{
-      studentId?: string
-      name: string
-      role?: string
-      isAvailableForMentoring: boolean
-    }>
-  }
+    category?: string
+    matchedRepositoryProject?: MatchedRepoSummary
+  }>
+}
+
+export interface RetrievalTelemetry {
+  executed: boolean
+  latencyMs: number
+  retrievedCount: number
+  retrievedProjectIds: string[]
+  retrievedProjectTitles: string[]
+  failed: boolean
+  error?: string
+  reusedCachedMatches?: boolean
 }
 
 export interface ConversationalTurnResult {
@@ -69,4 +113,6 @@ export interface ConversationalTurnResult {
   responseMarkdown: string
   suggestedFollowUps: string[]
   updatedContext: IConversationContext
+  retrievalTelemetry?: RetrievalTelemetry
+  retrievedMatches?: any[]
 }

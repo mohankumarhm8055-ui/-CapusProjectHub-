@@ -21,3 +21,32 @@ const envSchema = z.object({
 })
 
 export const config = envSchema.parse(process.env)
+
+const INSECURE_PLACEHOLDER_SECRETS = new Set([
+  'campusprojecthub-academic-jwt-secret-dev-2026',
+  'your-super-secret-jwt-key-change-in-production',
+  'secret',
+  'changeme',
+])
+
+export function validateSecurityConfig(): void {
+  const jwtSecret = config.JWT_SECRET.trim()
+  const isWeakOrDefault = jwtSecret.length < 32 || INSECURE_PLACEHOLDER_SECRETS.has(jwtSecret)
+
+  if (config.NODE_ENV === 'production') {
+    if (isWeakOrDefault) {
+      throw new Error(
+        '[Security] Production startup aborted: JWT_SECRET must be set to a unique random secret of at least 32 characters.'
+      )
+    }
+    if (config.ALLOW_INMEMORY_FALLBACK === 'true') {
+      throw new Error(
+        '[Security] Production startup aborted: ALLOW_INMEMORY_FALLBACK must be false in production.'
+      )
+    }
+  } else if (isWeakOrDefault) {
+    console.warn(
+      '[Security Warning] Using a development/placeholder JWT_SECRET. Set a strong 32+ character JWT_SECRET before deploying.'
+    )
+  }
+}

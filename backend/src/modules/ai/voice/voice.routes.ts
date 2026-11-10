@@ -5,9 +5,9 @@ import { aiRateLimiter } from '../../../middleware/rateLimit.js'
 
 const router = Router()
 
-// Public / Lightweight STT & TTS utility endpoints
-router.post('/transcribe', VoiceController.transcribeAudio)
-router.post('/synthesize', VoiceController.synthesizeSpeech)
+// Public / Lightweight STT & TTS utility endpoints (rate-limited)
+router.post('/transcribe', aiRateLimiter, VoiceController.transcribeAudio)
+router.post('/synthesize', aiRateLimiter, VoiceController.synthesizeSpeech)
 
 // Authenticated Voice Session endpoints
 router.use(authenticate)

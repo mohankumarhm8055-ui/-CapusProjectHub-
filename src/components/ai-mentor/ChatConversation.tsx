@@ -2,7 +2,7 @@ import React, { useEffect, useRef } from 'react'
 import { motion } from 'framer-motion'
 import { Sparkles, Square, ArrowDown } from 'lucide-react'
 import type { ChatMessage as ChatMessageType } from '../../types/aiMentor'
-import ChatMessage from './ChatMessage'
+import ChatMessage, { type MessageFeedbackPayload, type StoredFeedbackState } from './ChatMessage'
 
 interface ChatConversationProps {
   messages: ChatMessageType[]
@@ -10,6 +10,9 @@ interface ChatConversationProps {
   onStopGeneration: () => void
   onSelectFollowUp: (prompt: string) => void
   onRetry?: (message: ChatMessageType) => void
+  isOfflineDemo?: boolean
+  feedbackByMessageId?: Record<string, StoredFeedbackState>
+  onSubmitFeedback?: (messageId: string, payload: MessageFeedbackPayload) => Promise<void> | void
 }
 
 export const ChatConversation: React.FC<ChatConversationProps> = ({
@@ -18,6 +21,9 @@ export const ChatConversation: React.FC<ChatConversationProps> = ({
   onStopGeneration,
   onSelectFollowUp,
   onRetry,
+  isOfflineDemo = false,
+  feedbackByMessageId,
+  onSubmitFeedback,
 }) => {
   const bottomRef = useRef<HTMLDivElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
@@ -52,6 +58,9 @@ export const ChatConversation: React.FC<ChatConversationProps> = ({
           message={message}
           onSelectFollowUp={onSelectFollowUp}
           onRetry={onRetry}
+          isOfflineDemo={isOfflineDemo}
+          savedFeedback={feedbackByMessageId?.[message.id]}
+          onSubmitFeedback={onSubmitFeedback}
         />
       ))}
 
