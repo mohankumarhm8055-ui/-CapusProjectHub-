@@ -1,0 +1,31 @@
+# Environment variables and secrets
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.pyc
+venv/
+.venv/
+
+# Test and coverage
+coverage/
+.pytest_cache/
+
+# Temporary files
+*.tmp
+*.bak
+
+# Database files
+*.sqlite
+*.sqlite3
+
+# Node.js dependencies
+node_modules/
+**/node_modules/
+
+# Build output
+dist/
+**/dist/
+dist-ssr/
