@@ -27,13 +27,16 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
   return (
     <section
       ref={containerRef}
-      className="relative min-h-[680px] h-screen max-h-[1080px] w-full bg-[#DFE6EF] overflow-hidden flex flex-col justify-between selection:bg-[#6658FF]/20 cursor-default"
+      className="relative min-h-[680px] h-screen max-h-[1080px] w-full bg-[#DFE6EF] overflow-x-clip flex flex-col justify-between selection:bg-[#6658FF]/20 cursor-default"
     >
-      {/* 1. Animated background typography moving continuously at ultra-slow subtle speed */}
-      <BackgroundMarquee />
+      {/* Background decorative layers isolated inside clip wrapper so header dropdowns & mobile drawer are never clipped */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        {/* 1. Animated background typography moving continuously at ultra-slow subtle speed */}
+        <BackgroundMarquee />
 
-      {/* 2. Cursor-Following Technology Sticker Trail (Covers entire Hero) */}
-      <InteractiveStickerField containerRef={containerRef} />
+        {/* 2. Cursor-Following Technology Sticker Trail (Covers entire Hero) */}
+        <InteractiveStickerField containerRef={containerRef} />
+      </div>
 
       {/* 3. Top Navigation Bar */}
       <Navbar

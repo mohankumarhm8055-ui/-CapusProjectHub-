@@ -79,16 +79,21 @@ export const NotificationBell: React.FC = () => {
         setOpen(false)
       }
     }
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setOpen(false)
+    }
     document.addEventListener('mousedown', handleClickOutside)
-    return () => document.removeEventListener('mousedown', handleClickOutside)
+    document.addEventListener('keydown', handleKeyDown)
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside)
+      document.removeEventListener('keydown', handleKeyDown)
+    }
   }, [])
-
-  if (!user) return null
 
   const toggleOpen = async () => {
     const nextOpen = !open
     setOpen(nextOpen)
-    if (nextOpen) {
+    if (nextOpen && user) {
       setLoading(true)
       try {
         const res = await notificationApiService.listNotifications({ page: 1, limit: 6 })
@@ -123,23 +128,49 @@ export const NotificationBell: React.FC = () => {
   }
 
   return (
-    <div ref={containerRef} className="relative">
+    <div ref={containerRef} className="relative shrink-0">
       <button
         type="button"
         onClick={toggleOpen}
         aria-label="Academic notifications"
-        className="relative p-2 rounded-full text-slate-600 hover:text-[#6658FF] hover:bg-slate-100 transition-colors cursor-pointer"
+        aria-expanded={open}
+        aria-haspopup="menu"
+        className="relative p-2 rounded-full text-slate-700 hover:text-[#6658FF] hover:bg-white/80 transition-colors cursor-pointer focus:outline-none focus:ring-2 focus:ring-[#6658FF]/30"
       >
         <Bell className="w-4 h-4" />
-        {unreadCount > 0 && (
+        {user && unreadCount > 0 && (
           <span className="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 px-1 rounded-full bg-[#6658FF] text-white text-[10px] font-bold flex items-center justify-center">
             {unreadCount > 99 ? '99+' : unreadCount}
           </span>
         )}
       </button>
 
-      {open && (
-        <div className="absolute right-0 mt-2 w-80 sm:w-96 rounded-2xl bg-white border border-slate-200 shadow-xl z-50 overflow-hidden">
+      {open && !user && (
+        <div
+          role="menu"
+          className="fixed inset-x-4 top-[76px] sm:fixed sm:inset-x-auto sm:top-auto sm:absolute sm:right-0 sm:mt-2 sm:w-72 rounded-2xl bg-white border border-slate-200 shadow-xl z-50 overflow-hidden p-4 space-y-3"
+        >
+          <div>
+            <p className="text-xs font-bold text-[#0B192C]">Academic Notifications</p>
+            <p className="text-[11px] text-slate-500 mt-1 leading-relaxed">
+              Sign in to view project milestones, deadline reminders, and faculty review alerts.
+            </p>
+          </div>
+          <Link
+            to="/signin"
+            onClick={() => setOpen(false)}
+            className="block w-full text-center py-2 rounded-xl text-xs font-bold text-white bg-[#6658FF] hover:bg-[#5546FF] transition-colors"
+          >
+            Sign In to View Alerts
+          </Link>
+        </div>
+      )}
+
+      {open && user && (
+        <div
+          role="menu"
+          className="fixed inset-x-4 top-[76px] sm:inset-x-auto sm:top-auto sm:absolute sm:right-0 sm:mt-2 sm:w-96 rounded-2xl bg-white border border-slate-200 shadow-xl z-50 overflow-hidden"
+        >
           <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between">
             <span className="text-xs font-bold text-[#0B192C]">
               Notifications ({unreadCount} unread)
