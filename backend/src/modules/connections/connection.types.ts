@@ -89,17 +89,64 @@ export type NotificationType =
   | 'CONNECTION_CANCELLED'
   | 'CONNECTION_BLOCKED'
   | 'NEW_MESSAGE_RECEIVED'
+  | 'SCHEDULE_PUBLISHED'
+  | 'SCHEDULE_DEADLINE_UPDATED'
+  | 'SCHEDULE_REQUIREMENTS_UPDATED'
+  | 'ACTIVITY_DEADLINE_UPCOMING'
+  | 'ACTIVITY_DUE_TOMORROW'
+  | 'ACTIVITY_DUE_TODAY'
+  | 'ACTIVITY_OVERDUE'
+  | 'ACTIVITY_DEADLINE_REVISED'
+  | 'WEEKLY_REPORT_APPROACHING'
+  | 'WEEKLY_REPORT_DUE'
+  | 'WEEKLY_REPORT_OVERDUE'
+  | 'ACTIVITY_SUBMISSION_RECEIVED'
+  | 'ACTIVITY_SENT_FOR_REVIEW'
+  | 'WEEKLY_REPORT_SUBMITTED'
+  | 'SUBMISSION_CHANGES_REQUESTED'
+  | 'SUBMISSION_FEEDBACK_ADDED'
+  | 'SUBMISSION_APPROVED'
+  | 'SUBMISSION_REJECTED'
+  | 'WEEKLY_REPORT_CLARIFICATION_REQUESTED'
+  | 'WEEKLY_REPORT_FINALIZED'
+  | 'FINAL_REVIEW_REQUESTED'
+  | 'FINAL_CORRECTIONS_REQUIRED'
+  | 'FINAL_COMPLETION_APPROVED'
+  | 'PUBLICATION_DRAFT_READY'
+  | 'PROJECT_PUBLISHED'
+
+export type NotificationCategory =
+  | 'ACTIVITY'
+  | 'WEEKLY_REPORT'
+  | 'SUBMISSION'
+  | 'REVIEW'
+  | 'SCHEDULE'
+  | 'PUBLICATION'
+  | 'MENTORSHIP'
 
 export interface INotification {
   id: string
   recipientId: string
   type: NotificationType
+  category?: NotificationCategory
   title: string
   message: string
+  actionUrl?: string
+  deduplicationKey?: string
+  deadlineVersion?: number
+  deliveryStatus?: 'DELIVERED' | 'PENDING' | 'FAILED' | 'SKIPPED_PREFERENCE'
+  emailDeliveryStatus?: 'NOT_CONFIGURED' | 'SKIPPED' | 'SENT' | 'FAILED'
+  deliveryError?: string
+  cleared?: boolean
   data?: {
     connectionId?: string
     projectId?: string
     projectTitle?: string
+    scheduleId?: string
+    activityId?: string
+    reportId?: string
+    submissionId?: string
+    weekNumber?: number
     senderId?: string
     senderName?: string
   }

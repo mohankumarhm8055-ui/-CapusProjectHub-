@@ -7,6 +7,12 @@ import aiRoutes from './modules/ai/ai.routes.js'
 import repositoryRoutes from './modules/repository/repository.routes.js'
 import proposalRoutes from './modules/proposals/proposal.routes.js'
 import connectionRoutes from './modules/connections/connection.routes.js'
+import scheduleRoutes from './modules/schedules/schedule.routes.js'
+import activitySubmissionRoutes from './modules/activity-submissions/submission.routes.js'
+import weeklyReportRoutes from './modules/weekly-reports/weeklyReport.routes.js'
+import notificationRoutes from './modules/notifications/notification.routes.js'
+import facultyReviewRoutes from './modules/faculty-review/facultyReview.routes.js'
+import finalLifecycleRoutes from './modules/final-lifecycle/lifecycle.routes.js'
 import { errorHandler } from './middleware/error.middleware.js'
 
 export function createApp(): Express {
@@ -25,9 +31,9 @@ export function createApp(): Express {
     next()
   })
 
-  // Environment-aware CORS configuration
+  // Environment-aware CORS configuration (strip trailing slashes for exact Origin header match)
   const configuredOrigins = config.CLIENT_URL.split(',')
-    .map((o) => o.trim())
+    .map((o) => o.trim().replace(/\/$/, ''))
     .filter(Boolean)
   const devOrigins = ['http://localhost:5173', 'http://localhost:5174', 'http://127.0.0.1:5173']
   const allowedOrigins =
@@ -37,7 +43,14 @@ export function createApp(): Express {
 
   app.use(
     cors({
-      origin: allowedOrigins,
+      origin: (origin, callback) => {
+        if (!origin) return callback(null, true)
+        const normalized = origin.trim().replace(/\/$/, '')
+        if (allowedOrigins.includes(normalized)) {
+          return callback(null, true)
+        }
+        return callback(new Error(`CORS origin not allowed: ${origin}`))
+      },
       credentials: true,
       methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
       allowedHeaders: ['Content-Type', 'Authorization', 'Accept'],
@@ -80,6 +93,24 @@ export function createApp(): Express {
 
   // Mount Senior-Junior Connection Intelligence routes
   app.use('/api/connections', connectionRoutes)
+
+  // Mount Academic Project Schedule Manager & Template Initialization routes
+  app.use('/api/schedules', scheduleRoutes)
+
+  // Mount Student Activity Tracker & Evidence Submission routes
+  app.use('/api/activity-submissions', activitySubmissionRoutes)
+
+  // Mount Weekly Student Progress Reporting routes
+  app.use('/api/weekly-reports', weeklyReportRoutes)
+
+  // Mount Academic Notification Centre & Deadline Reminder Engine routes
+  app.use('/api/notifications', notificationRoutes)
+
+  // Mount Faculty Review and Approval Workspace routes
+  app.use('/api/faculty-review', facultyReviewRoutes)
+
+  // Mount Final Project Completion & Faculty-Controlled Publication routes
+  app.use('/api/final-lifecycle', finalLifecycleRoutes)
 
   // Standardized Error Handler
   app.use(errorHandler)

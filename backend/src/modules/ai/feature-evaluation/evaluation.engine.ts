@@ -60,7 +60,7 @@ export class EvaluationEngine {
   evaluateFeature(
     name: string,
     constraints: IProjectConstraints,
-    allProposedFeatures: string[]
+    _allProposedFeatures: string[]
   ): IEvaluatedFeature {
     const n = name.toLowerCase().trim()
     const featureId = name.toLowerCase().replace(/[^\w\s-]/g, '').replace(/\s+/g, '-')

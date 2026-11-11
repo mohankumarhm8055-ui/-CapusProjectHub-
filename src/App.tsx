@@ -13,6 +13,12 @@ import SignInPage from './pages/SignInPage'
 import SignUpPage from './pages/SignUpPage'
 import AIMentorPage from './pages/AIMentorPage'
 import ProposalEditorPage from './pages/ProposalEditorPage'
+import AcademicSchedulePage from './pages/AcademicSchedulePage'
+import StudentActivityTrackerPage from './pages/StudentActivityTrackerPage'
+import WeeklyReportsPage from './pages/WeeklyReportsPage'
+import NotificationsPage from './pages/NotificationsPage'
+import FacultyReviewPage from './pages/FacultyReviewPage'
+import FinalCompletionPage from './pages/FinalCompletionPage'
 import ProtectedRoute from './components/auth/ProtectedRoute'
 
 // Helper component that scrolls to top whenever route pathname changes
@@ -106,6 +112,122 @@ function AppRoutes() {
           element={
             <ProtectedRoute>
               <ProposalEditorPage />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Academic Schedule Manager (Authenticated) */}
+        <Route
+          path="/academic-schedule"
+          element={
+            <ProtectedRoute>
+              <AcademicSchedulePage />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Student Activity Tracker & Evidence Submission (Authenticated) */}
+        <Route
+          path="/activity-tracker"
+          element={
+            <ProtectedRoute>
+              <StudentActivityTrackerPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/activity-tracker/:scheduleId"
+          element={
+            <ProtectedRoute>
+              <StudentActivityTrackerPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/activity-tracker/:scheduleId/activities/:activityId"
+          element={
+            <ProtectedRoute>
+              <StudentActivityTrackerPage />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Weekly Student Progress Reporting (Authenticated) */}
+        <Route
+          path="/weekly-reports"
+          element={
+            <ProtectedRoute>
+              <WeeklyReportsPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/weekly-reports/:scheduleId"
+          element={
+            <ProtectedRoute>
+              <WeeklyReportsPage />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Academic Notification Centre (Authenticated) */}
+        <Route
+          path="/notifications"
+          element={
+            <ProtectedRoute>
+              <NotificationsPage />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Faculty Review & Approval Workspace (Authenticated Faculty / Admin) */}
+        <Route
+          path="/faculty-review"
+          element={
+            <ProtectedRoute>
+              <FacultyReviewPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/faculty-review/submissions/:submissionId"
+          element={
+            <ProtectedRoute>
+              <FacultyReviewPage />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Final Project Completion & Controlled Repository Publication */}
+        <Route
+          path="/final-completion"
+          element={
+            <ProtectedRoute>
+              <FinalCompletionPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/final-completion/:scheduleId"
+          element={
+            <ProtectedRoute>
+              <FinalCompletionPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/faculty-final-review"
+          element={
+            <ProtectedRoute>
+              <FinalCompletionPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/faculty-final-review/:scheduleId"
+          element={
+            <ProtectedRoute>
+              <FinalCompletionPage />
             </ProtectedRoute>
           }
         />

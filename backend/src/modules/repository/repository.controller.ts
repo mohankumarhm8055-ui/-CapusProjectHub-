@@ -79,15 +79,24 @@ export const RepositoryController = {
         naturalLanguage: naturalLanguage === 'true',
       })
 
-      // Mask student private contact information for unprivileged callers
+      // Mask private contact details & internal review metadata for public callers
       const sanitized = await Promise.all(
         result.projects.map(async (p) => ({
           ...p,
           workflowStatus: p.reviewStatus,
           technologies: p.technologyStack.map((t) => t.name),
           teamMembers: await sanitizeTeamMembersForPublic(p.teamMembers, req.user?.id),
+          facultyGuide: p.facultyGuide
+            ? {
+                name: p.facultyGuide.name,
+                designation: p.facultyGuide.designation,
+                department: p.facultyGuide.department,
+              }
+            : p.facultyGuide,
           rejectionReason: undefined,
           changeRequests: undefined,
+          unpublishedReason: undefined,
+          publishedAssetFileIds: undefined,
         }))
       )
 
@@ -117,10 +126,16 @@ export const RepositoryController = {
         return
       }
 
-      // Check if project is authorized for viewing (must be verified or owner/faculty)
+      // Check if project is authorized for viewing (must be verified + not unpublished/archived/draft-only)
+      const isBlockedByPublication =
+        project.publicationStatus === 'NOT_PUBLISHED' ||
+        project.publicationStatus === 'UNPUBLISHED' ||
+        project.publicationStatus === 'ARCHIVED'
+
       const isVerified =
-        project.verificationStatus === 'VERIFIED_HISTORICAL' ||
-        (project.verificationStatus === 'FACULTY_APPROVED' && project.reviewStatus === 'APPROVED')
+        !isBlockedByPublication &&
+        (project.verificationStatus === 'VERIFIED_HISTORICAL' ||
+          (project.verificationStatus === 'FACULTY_APPROVED' && project.reviewStatus === 'APPROVED'))
 
       const isOwner = req.user?.id === project.uploadedBy
       const isAdmin = req.user?.role === 'admin'
@@ -130,7 +145,7 @@ export const RepositoryController = {
       if (!isVerified && !isOwner && !isAdmin && !isFacultyAuthorized) {
         res.status(403).json({
           success: false,
-          error: { message: 'This project record is under review and not yet publicly accessible' },
+          error: { message: 'This project record is not publicly published or is restricted.' },
         })
         return
       }
@@ -142,7 +157,17 @@ export const RepositoryController = {
           workflowStatus: project.reviewStatus,
           technologies: project.technologyStack.map((t) => t.name),
           teamMembers: await sanitizeTeamMembersForPublic(project.teamMembers, req.user?.id),
+          facultyGuide: project.facultyGuide
+            ? {
+                name: project.facultyGuide.name,
+                designation: project.facultyGuide.designation,
+                department: project.facultyGuide.department,
+              }
+            : project.facultyGuide,
           rejectionReason: isOwner || isAdmin || isFacultyAuthorized ? project.rejectionReason : undefined,
+          changeRequests: isOwner || isAdmin || isFacultyAuthorized ? project.changeRequests : undefined,
+          unpublishedReason: isOwner || isAdmin || isFacultyAuthorized ? project.unpublishedReason : undefined,
+          publishedAssetFileIds: undefined,
         },
       })
     } catch (err) {

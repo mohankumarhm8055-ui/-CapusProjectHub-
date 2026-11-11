@@ -30,6 +30,8 @@ import ProjectCommunitySection from '../components/ProjectCommunitySection'
 import RelatedProjectsCarousel from '../components/RelatedProjectsCarousel'
 import { DEMO_PROJECTS, INITIAL_COMMENTS } from '../data/mockProjects'
 import { repositoryService } from '../services/repositoryService'
+import { authService } from '../services/authService'
+import { finalLifecycleApiService } from '../services/finalLifecycleApiService'
 import IdeaSimilarityModal from '../components/ai-mentor/IdeaSimilarityModal'
 import type { Project, TechCategory } from '../types/project'
 
@@ -48,11 +50,15 @@ interface ProjectDetailsPageProps {
 export const ProjectDetailsPage: React.FC<ProjectDetailsPageProps> = ({
   onSignInClick,
   onSignUpClick,
-  isAuthenticated = false,
+  isAuthenticated,
 }) => {
   const { projectId } = useParams<{ projectId: string }>()
+  const effectiveIsAuthenticated = Boolean(isAuthenticated || authService.getCurrentUser())
 
   const [liveProject, setLiveProject] = useState<Project | null>(null)
+  const [relatedCatalog, setRelatedCatalog] = useState<Project[]>(DEMO_PROJECTS)
+  const [fetchError, setFetchError] = useState<string | null>(null)
+  const [docNotice, setDocNotice] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState<boolean>(true)
   const [isIdeaModalOpen, setIsIdeaModalOpen] = useState<boolean>(false)
 
@@ -74,6 +80,8 @@ export const ProjectDetailsPage: React.FC<ProjectDetailsPageProps> = ({
     }
 
     // Attempt to fetch from real backend repository
+    setFetchError(null)
+    setDocNotice(null)
     repositoryService
       .getProjectById(projectId)
       .then((repo) => {
@@ -90,7 +98,7 @@ export const ProjectDetailsPage: React.FC<ProjectDetailsPageProps> = ({
             repo.screenshots?.[0]?.url ||
             'https://images.unsplash.com/photo-1517694712202-14dd9538aa97?auto=format&fit=crop&w=800&q=80',
           screenshots: (repo.screenshots || []).map((s, idx) => ({ id: String(idx), url: s.url, caption: s.caption || '' })),
-          category: 'Artificial Intelligence',
+          category: repo.category || repo.department || 'Software Engineering',
           department: repo.department,
           academicYear: repo.academicYear,
           difficulty: 'Intermediate',
@@ -123,7 +131,7 @@ export const ProjectDetailsPage: React.FC<ProjectDetailsPageProps> = ({
             profileImage: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80',
             role: m.role || 'Contributor',
             department: m.department || repo.department,
-            semester: '8th Semester',
+            semester: repo.semester || 'Recorded in Dossier',
             responsibilities: [],
             isLeader: m.isLeader || false,
             isAvailableForMentoring: m.isAvailableForMentoring === true,
@@ -143,16 +151,83 @@ export const ProjectDetailsPage: React.FC<ProjectDetailsPageProps> = ({
               : repo.verificationStatus === 'FACULTY_APPROVED'
               ? 'Faculty Approved'
               : 'Pending Review',
-          likesCount: 15,
-          commentsCount: 3,
-          createdAt: repo.createdAt || new Date().toISOString(),
+          likesCount: 0,
+          commentsCount: 0,
+          createdAt: repo.createdAt || '2025-01-01T00:00:00.000Z',
           sourceType: repo.sourceType,
           verificationStatus: repo.verificationStatus,
         }
         setLiveProject(adapted)
+
+        if (authService.getCurrentUser()) {
+          const protectedUrls = [
+            ...(adapted.screenshots || []).map((s: any) => s.url),
+            adapted.coverImage,
+          ].filter(
+            (u: string) =>
+              typeof u === 'string' && u.startsWith('/api/final-lifecycle/published-files/')
+          )
+          if (protectedUrls.length > 0) {
+            Promise.all(
+              Array.from(new Set<string>(protectedUrls)).map(async (origUrl) => {
+                try {
+                  const blobUrl = await finalLifecycleApiService.fetchAuthenticatedAssetBlobUrl(origUrl, false)
+                  return [origUrl, blobUrl] as const
+                } catch {
+                  return [origUrl, origUrl] as const
+                }
+              })
+            ).then((entries) => {
+              const urlMap = new Map(entries)
+              setLiveProject((prev: any) =>
+                prev && prev.id === adapted.id
+                  ? {
+                      ...prev,
+                      coverImage: urlMap.get(prev.coverImage) || prev.coverImage,
+                      screenshots: (prev.screenshots || []).map((s: any) => ({
+                        ...s,
+                        url: urlMap.get(s.url) || s.url,
+                      })),
+                    }
+                  : prev
+              )
+            })
+          }
+        }
+
+        // Load related catalog records from live repository
+        repositoryService
+          .searchProjects({ limit: 6 })
+          .then((listRes) => {
+            if (listRes.projects.length > 0) {
+              setRelatedCatalog(
+                listRes.projects.map((p) => ({
+                  ...adapted,
+                  id: p.id,
+                  title: p.title,
+                  slug: p.slug,
+                  description: p.abstract || p.problemStatement,
+                  category: (p.category as any) || p.department || 'Software Engineering',
+                  department: p.department,
+                  academicYear: p.academicYear,
+                  coverImage:
+                    p.screenshots?.[0]?.url ||
+                    'https://images.unsplash.com/photo-1517694712202-14dd9538aa97?auto=format&fit=crop&w=800&q=80',
+                  technologies: (p.technologyStack || []).map((t) => ({ name: t.name, category: 'Frontend' as const })),
+                }))
+              )
+            }
+          })
+          .catch(() => {})
       })
-      .catch(() => {
+      .catch((err: any) => {
         setLiveProject(null)
+        setFetchError(
+          err?.message ||
+            (!authService.getCurrentUser()
+              ? 'Sign in to view full verified project repository dossiers.'
+              : 'The requested project repository record could not be found or is restricted.')
+        )
       })
       .finally(() => setIsLoading(false))
   }, [projectId])
@@ -180,9 +255,9 @@ export const ProjectDetailsPage: React.FC<ProjectDetailsPageProps> = ({
           <div className="w-14 h-14 rounded-2xl bg-rose-50 text-rose-500 flex items-center justify-center mx-auto mb-4">
             <AlertCircle className="w-7 h-7" />
           </div>
-          <h2 className="text-2xl font-bold text-[#0B192C]">Project Not Found</h2>
+          <h2 className="text-2xl font-bold text-[#0B192C]">Project Unavailable</h2>
           <p className="mt-2 text-sm text-slate-500">
-            The requested project repository record could not be found or may have been archived.
+            {fetchError || 'The requested project repository record could not be found or may have been archived.'}
           </p>
           <Link
             to="/explore-projects"
@@ -622,7 +697,7 @@ export const ProjectDetailsPage: React.FC<ProjectDetailsPageProps> = ({
                 onRequireAuth={() => {
                   if (onSignUpClick) onSignUpClick()
                 }}
-                isAuthenticated={isAuthenticated}
+                isAuthenticated={effectiveIsAuthenticated}
               />
             </div>
 
@@ -744,21 +819,73 @@ export const ProjectDetailsPage: React.FC<ProjectDetailsPageProps> = ({
                 </div>
               </div>
 
-              {/* Section G: Download Documentation & Report */}
+              {/* Section G: Documentation & Report */}
               <div className="bg-gradient-to-br from-[#6658FF]/5 via-blue-50/30 to-white rounded-3xl p-6 border border-[#6658FF]/20 space-y-3">
                 <h4 className="text-sm font-bold text-[#0B192C] flex items-center gap-2">
                   <FileText className="w-4 h-4 text-[#6658FF]" />
                   <span>Capstone Documentation</span>
                 </h4>
                 <p className="text-xs text-slate-600 leading-relaxed">
-                  Download academic project report preview, problem formulation slides, and schema diagrams.
+                  Academic project report documents and technical references attached to this repository record.
                 </p>
-                <button
-                  onClick={() => alert(`Documentation download triggered for: ${project.title} (Demonstration record).`)}
-                  className="w-full py-2.5 rounded-xl font-bold text-xs text-white bg-gradient-to-r from-[#2563EB] to-[#6658FF] hover:from-[#1D4ED8] hover:to-[#5546FF] transition-all cursor-pointer shadow-xs"
-                >
-                  Download Project Report PDF
-                </button>
+                {(project as any).reportDocuments && (project as any).reportDocuments.length > 0 && (project as any).reportDocuments[0]?.fileUrl ? (
+                  String((project as any).reportDocuments[0].fileUrl).startsWith('/api/final-lifecycle/published-files/') ? (
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        try {
+                          const blobUrl = await finalLifecycleApiService.fetchAuthenticatedAssetBlobUrl(
+                            (project as any).reportDocuments[0].fileUrl,
+                            false
+                          )
+                          window.open(blobUrl, '_blank', 'noopener,noreferrer')
+                        } catch (err) {
+                          setDocNotice(
+                            err instanceof Error ? err.message : 'Sign in to access approved project report documents.'
+                          )
+                        }
+                      }}
+                      className="block text-center w-full py-2.5 rounded-xl font-bold text-xs text-white bg-gradient-to-r from-[#2563EB] to-[#6658FF] hover:from-[#1D4ED8] hover:to-[#5546FF] transition-all shadow-xs cursor-pointer"
+                    >
+                      Open Approved Report ({(project as any).reportDocuments[0].title || 'PDF'})
+                    </button>
+                  ) : (
+                    <a
+                      href={(project as any).reportDocuments[0].fileUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="block text-center w-full py-2.5 rounded-xl font-bold text-xs text-white bg-gradient-to-r from-[#2563EB] to-[#6658FF] hover:from-[#1D4ED8] hover:to-[#5546FF] transition-all shadow-xs"
+                    >
+                      Open Archived Report ({(project as any).reportDocuments[0].title || 'PDF'})
+                    </a>
+                  )
+                ) : project.documentationUrl ? (
+                  <a
+                    href={project.documentationUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="block text-center w-full py-2.5 rounded-xl font-bold text-xs text-white bg-gradient-to-r from-[#2563EB] to-[#6658FF] hover:from-[#1D4ED8] hover:to-[#5546FF] transition-all shadow-xs"
+                  >
+                    Open Project Documentation
+                  </a>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setDocNotice(
+                        `No PDF report document is currently archived for "${project.title}". Use the AI Mentor to compare its documented modules or connect with contributors.`
+                      )
+                    }
+                    className="w-full py-2.5 rounded-xl font-bold text-xs text-slate-700 bg-slate-100 hover:bg-slate-200 border border-slate-200 transition-all cursor-pointer"
+                  >
+                    Check Archived Report Availability
+                  </button>
+                )}
+                {docNotice && (
+                  <p className="text-[11px] text-amber-800 bg-amber-50 border border-amber-200 rounded-lg p-2.5">
+                    {docNotice}
+                  </p>
+                )}
               </div>
             </div>
           </div>
@@ -767,7 +894,7 @@ export const ProjectDetailsPage: React.FC<ProjectDetailsPageProps> = ({
           <div className="mt-12 sm:mt-16">
             <RelatedProjectsCarousel
               currentProject={project}
-              allProjects={DEMO_PROJECTS}
+              allProjects={relatedCatalog}
             />
           </div>
         </div>

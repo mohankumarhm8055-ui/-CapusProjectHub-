@@ -1,4 +1,5 @@
 import type { SpokenLanguage, AudioPlaybackSpeed, VoiceState, VoiceTranscriptTurn } from '../types/aiMentor'
+import { getApiBaseUrl } from './sessionService'
 
 declare global {
   interface Window {
@@ -7,10 +8,7 @@ declare global {
   }
 }
 
-const VOICE_API_BASE =
-  typeof window !== 'undefined' && window.location.origin.includes(':5173')
-    ? 'http://localhost:5000/api/ai/voice'
-    : '/api/ai/voice'
+const getVoiceApiBase = () => `${getApiBaseUrl()}/api/ai/voice`
 
 // Structured diagnostic logging helper for Speech-to-Text and Voice Playback
 function voiceLog(stage: string, data?: Record<string, any>) {
@@ -285,7 +283,7 @@ class VoiceService {
     })
 
     const audioBase64 = await base64Promise
-    const res = await fetch(`${VOICE_API_BASE}/transcribe`, {
+    const res = await fetch(`${getVoiceApiBase()}/transcribe`, {
       method: 'POST',
       headers: this.getHeaders(),
       body: JSON.stringify({ audioBase64, language }),
@@ -519,7 +517,7 @@ class VoiceService {
               return
             }
 
-            voiceLog('Uploading recorded audio to backend STT', { endpoint: `${VOICE_API_BASE}/transcribe` })
+            voiceLog('Uploading recorded audio to backend STT', { endpoint: `${getVoiceApiBase()}/transcribe` })
             const audioBlob = new Blob(this.audioChunks, { type: this.activeRecorderMime })
 
             try {
@@ -756,7 +754,7 @@ class VoiceService {
   }
 
   async startVoiceSession(conversationId: string, language: SpokenLanguage = 'auto'): Promise<VoiceSessionData> {
-    const res = await fetch(`${VOICE_API_BASE}/sessions`, {
+    const res = await fetch(`${getVoiceApiBase()}/sessions`, {
       method: 'POST',
       headers: this.getHeaders(),
       body: JSON.stringify({ conversationId, language }),
@@ -776,7 +774,7 @@ class VoiceService {
     mentorTurn: VoiceTranscriptTurn
     audio: { audioUrl: string; durationSeconds: number }
   }> {
-    const res = await fetch(`${VOICE_API_BASE}/sessions/${sessionId}/interact`, {
+    const res = await fetch(`${getVoiceApiBase()}/sessions/${sessionId}/interact`, {
       method: 'POST',
       headers: this.getHeaders(),
       body: JSON.stringify({ speech, language }),
@@ -788,7 +786,7 @@ class VoiceService {
 
   async interruptVoiceSession(sessionId: string): Promise<VoiceSessionData> {
     this.stopSpeech()
-    const res = await fetch(`${VOICE_API_BASE}/sessions/${sessionId}/interrupt`, {
+    const res = await fetch(`${getVoiceApiBase()}/sessions/${sessionId}/interrupt`, {
       method: 'POST',
       headers: this.getHeaders(),
     })
@@ -800,7 +798,7 @@ class VoiceService {
   async endVoiceSession(sessionId: string): Promise<VoiceSessionData> {
     this.stopSpeech()
     this.stopListening()
-    const res = await fetch(`${VOICE_API_BASE}/sessions/${sessionId}/end`, {
+    const res = await fetch(`${getVoiceApiBase()}/sessions/${sessionId}/end`, {
       method: 'POST',
       headers: this.getHeaders(),
     })

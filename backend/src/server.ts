@@ -4,6 +4,8 @@ import { connectDatabase, disconnectDatabase } from './config/db.js'
 import { seedRepository } from './modules/repository/repository.seeder.js'
 import { seedMentorProfiles } from './modules/connections/connection.model.js'
 import { seedCollegeTemplates } from './modules/proposals/template.model.js'
+import { seedScheduleTemplates } from './modules/schedules/schedule.seeder.js'
+import { reminderEngineService } from './modules/notifications/reminder.engine.js'
 
 async function bootstrap() {
   // Fail fast if production security invariants are violated
@@ -16,6 +18,8 @@ async function bootstrap() {
   await seedRepository()
   await seedMentorProfiles()
   await seedCollegeTemplates()
+  await seedScheduleTemplates()
+  await reminderEngineService.startScheduler()
 
   const app = createApp()
 
@@ -27,6 +31,7 @@ async function bootstrap() {
   // Graceful shutdown handling
   const shutdown = async () => {
     console.log('[CampusProjectHub Backend] Shutting down server gracefully...')
+    reminderEngineService.stopScheduler()
     server.close(async () => {
       await disconnectDatabase()
       console.log('[CampusProjectHub Backend] Closed out remaining connections.')

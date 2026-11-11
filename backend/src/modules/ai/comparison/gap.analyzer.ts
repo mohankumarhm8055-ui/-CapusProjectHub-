@@ -9,7 +9,6 @@ import type {
   ContributionCategoryType,
   DifferentiatedFeatureAssessment,
   DifferentiationClassification,
-  DimensionRelation,
   ExistingVsProposedAreaRow,
   FeasibilitySummary,
   IdentifiedResearchGap,

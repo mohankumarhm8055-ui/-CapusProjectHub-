@@ -230,6 +230,10 @@ describe('TASK 26 — Intelligent Existing Project vs Proposed Project Compariso
       'Actually instead of that, switch to Smart Attendance Management System with rotating QR tokens'
     )
     assert.ok(r2.includes('Smart Attendance Management System'))
+    assert.ok(r2.includes('Faculty Guide (Documented)'))
+    assert.ok(r2.includes('Dr. Ramesh Babu'))
+    assert.ok(r2.includes('Documented Objectives'))
+    assert.ok(!r2.includes('ramesh.babu@rvce.edu.in'), 'Private faculty email must not leak into AI Mentor prose')
   })
 
   it('7b & 8. No existing match yields honest novelty disclaimer; Multiple existing matches synthesize cleanly', async () => {

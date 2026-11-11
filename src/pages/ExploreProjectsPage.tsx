@@ -17,6 +17,7 @@ import ExploreProjectCard from '../components/ExploreProjectCard'
 import IdeaSimilarityModal from '../components/ai-mentor/IdeaSimilarityModal'
 import { DEMO_PROJECTS } from '../data/mockProjects'
 import { repositoryService, type RepositoryProject } from '../services/repositoryService'
+import { authService } from '../services/authService'
 import type { Project, ProjectDifficulty } from '../types/project'
 
 interface ExploreProjectsPageProps {
@@ -68,10 +69,12 @@ export const ExploreProjectsPage: React.FC<ExploreProjectsPageProps> = ({
 
   // Real backend repository state
   const [liveProjects, setLiveProjects] = useState<RepositoryProject[]>([])
-  const [totalCount, setTotalCount] = useState<number>(DEMO_PROJECTS.length)
+  const [isBackendConnected, setIsBackendConnected] = useState<boolean>(false)
+  const [repoNotice, setRepoNotice] = useState<string | null>(null)
+  const [totalCount, setTotalCount] = useState<number>(0)
   const [currentPage, setCurrentPage] = useState<number>(1)
   const [totalPages, setTotalPages] = useState<number>(1)
-  const [isLoading, setIsLoading] = useState<boolean>(false)
+  const [isLoading, setIsLoading] = useState<boolean>(true)
   const [isIdeaModalOpen, setIsIdeaModalOpen] = useState<boolean>(false)
 
   // Fetch from real backend repository
@@ -98,14 +101,22 @@ export const ExploreProjectsPage: React.FC<ExploreProjectsPageProps> = ({
         })
 
         if (!isCancelled) {
+          setIsBackendConnected(true)
+          setRepoNotice(null)
           setLiveProjects(res.projects)
           setTotalCount(res.totalCount)
           setTotalPages(res.totalPages)
         }
-      } catch {
-        // Fall back gracefully to mock demonstration projects if backend is offline
+      } catch (err: any) {
         if (!isCancelled) {
+          setIsBackendConnected(false)
           setLiveProjects([])
+          const loggedIn = Boolean(authService.getCurrentUser())
+          setRepoNotice(
+            !loggedIn
+              ? 'Sign in to search the live verified MongoDB repository. Showing curated sample catalog below.'
+              : err?.message || 'Live repository unavailable. Showing curated sample catalog below.'
+          )
         }
       } finally {
         if (!isCancelled) setIsLoading(false)
@@ -127,10 +138,11 @@ export const ExploreProjectsPage: React.FC<ExploreProjectsPageProps> = ({
     currentPage,
   ])
 
-  // Map live repository projects or fallback to DEMO_PROJECTS
+  // Map live repository projects or fallback to DEMO_PROJECTS ONLY when backend is unavailable
   const displayedProjects: Project[] = useMemo(() => {
-    if (liveProjects.length > 0) {
-      return liveProjects.map((p) => ({
+    let mapped: Project[] = []
+    if (isBackendConnected) {
+      mapped = liveProjects.map((p) => ({
         id: p.id,
         title: p.title,
         slug: p.slug,
@@ -143,7 +155,7 @@ export const ExploreProjectsPage: React.FC<ExploreProjectsPageProps> = ({
           p.screenshots?.[0]?.url ||
           'https://images.unsplash.com/photo-1517694712202-14dd9538aa97?auto=format&fit=crop&w=800&q=80',
         screenshots: (p.screenshots || []).map((s, idx) => ({ id: String(idx), url: s.url, caption: s.caption || '' })),
-        category: (p.category as any) || 'Artificial Intelligence',
+        category: (p.category as any) || p.department || 'Software Engineering',
         department: p.department,
         academicYear: p.academicYear,
         difficulty: 'Intermediate' as ProjectDifficulty,
@@ -169,7 +181,7 @@ export const ExploreProjectsPage: React.FC<ExploreProjectsPageProps> = ({
           profileImage: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80',
           role: m.role || 'Contributor',
           department: m.department || p.department,
-          semester: '8th Semester',
+          semester: p.semester || 'Recorded in Dossier',
           responsibilities: [],
           isLeader: m.isLeader || false,
           isAvailableForMentoring: m.isAvailableForMentoring === true,
@@ -189,30 +201,48 @@ export const ExploreProjectsPage: React.FC<ExploreProjectsPageProps> = ({
             : p.verificationStatus === 'FACULTY_APPROVED'
             ? 'Faculty Approved'
             : 'Pending Review',
-        likesCount: 12,
-        commentsCount: 4,
-        createdAt: p.createdAt || new Date().toISOString(),
+        likesCount: (p as any).likesCount ?? 0,
+        commentsCount: (p as any).commentsCount ?? 0,
+        createdAt: p.createdAt || '2025-01-01T00:00:00.000Z',
         sourceType: p.sourceType,
         verificationStatus: p.verificationStatus,
       } as any))
+    } else {
+      mapped = DEMO_PROJECTS.filter((p) => {
+        if (selectedCategory !== 'All Projects' && p.category !== selectedCategory) return false
+        if (selectedDepartment !== 'All Departments' && p.department !== selectedDepartment) return false
+        if (selectedYear !== 'All Years' && p.academicYear !== selectedYear) return false
+        if (approvedOnly && p.approvalStatus !== 'Faculty Approved') return false
+        const query = searchQuery.trim().toLowerCase()
+        if (query) {
+          const matchesTitle = p.title.toLowerCase().includes(query)
+          const matchesDesc = p.description.toLowerCase().includes(query)
+          const matchesTech = p.technologies.some((t) => t.name.toLowerCase().includes(query))
+          if (!matchesTitle && !matchesDesc && !matchesTech) return false
+        }
+        return true
+      })
     }
 
-    // Mock fallback when offline
-    return DEMO_PROJECTS.filter((p) => {
-      if (selectedCategory !== 'All Projects' && p.category !== selectedCategory) return false
-      if (selectedDepartment !== 'All Departments' && p.department !== selectedDepartment) return false
-      if (selectedYear !== 'All Years' && p.academicYear !== selectedYear) return false
-      if (approvedOnly && p.approvalStatus !== 'Faculty Approved') return false
-      const query = searchQuery.trim().toLowerCase()
-      if (query) {
-        const matchesTitle = p.title.toLowerCase().includes(query)
-        const matchesDesc = p.description.toLowerCase().includes(query)
-        const matchesTech = p.technologies.some((t) => t.name.toLowerCase().includes(query))
-        if (!matchesTitle && !matchesDesc && !matchesTech) return false
-      }
-      return true
-    })
-  }, [liveProjects, selectedCategory, selectedDepartment, selectedYear, approvedOnly, searchQuery])
+    if (sortBy === 'mostLiked') {
+      return [...mapped].sort((a, b) => (b.likesCount || 0) - (a.likesCount || 0))
+    }
+    if (sortBy === 'mostDiscussed') {
+      return [...mapped].sort((a, b) => (b.commentsCount || 0) - (a.commentsCount || 0))
+    }
+    return [...mapped].sort(
+      (a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime()
+    )
+  }, [
+    isBackendConnected,
+    liveProjects,
+    selectedCategory,
+    selectedDepartment,
+    selectedYear,
+    approvedOnly,
+    searchQuery,
+    sortBy,
+  ])
 
   const handleResetFilters = () => {
     setSearchQuery('')
@@ -477,10 +507,12 @@ export const ExploreProjectsPage: React.FC<ExploreProjectsPageProps> = ({
             )}
 
             {/* Results Count & Reset row */}
-            <div className="flex items-center justify-between text-xs text-slate-500 pt-1">
+            <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-slate-500 pt-1">
               <span className="flex items-center gap-1.5 font-mono">
-                <span className="w-2 h-2 rounded-full bg-emerald-500" />
-                Showing <strong>{displayedProjects.length}</strong> of {totalCount} Repository Records
+                <span className={`w-2 h-2 rounded-full ${isBackendConnected ? 'bg-emerald-500' : 'bg-amber-500'}`} />
+                Showing <strong>{displayedProjects.length}</strong> of{' '}
+                {isBackendConnected ? totalCount : displayedProjects.length}{' '}
+                {isBackendConnected ? 'Live Repository Records' : 'Sample Catalog Records'}
                 {isLoading && <span className="text-indigo-600 font-sans ml-2 animate-pulse">Updating...</span>}
               </span>
 
@@ -494,12 +526,29 @@ export const ExploreProjectsPage: React.FC<ExploreProjectsPageProps> = ({
                 </button>
               )}
             </div>
+
+            {repoNotice && (
+              <div className="p-2.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 text-xs flex items-center justify-between gap-2">
+                <span>{repoNotice}</span>
+              </div>
+            )}
           </div>
         </div>
 
         {/* Project Gallery Grid */}
         <div className="max-w-7xl mx-auto px-5 sm:px-8 lg:px-14 py-12 sm:py-16">
-          {displayedProjects.length > 0 ? (
+          {isLoading && displayedProjects.length === 0 ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8">
+              {[0, 1, 2].map((i) => (
+                <div key={i} className="h-80 rounded-3xl bg-white border border-slate-200 p-6 animate-pulse space-y-4">
+                  <div className="h-36 bg-slate-100 rounded-2xl" />
+                  <div className="h-4 bg-slate-100 rounded w-3/4" />
+                  <div className="h-3 bg-slate-100 rounded w-full" />
+                  <div className="h-3 bg-slate-100 rounded w-2/3" />
+                </div>
+              ))}
+            </div>
+          ) : displayedProjects.length > 0 ? (
             <>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8">
                 {displayedProjects.map((project, idx) => (

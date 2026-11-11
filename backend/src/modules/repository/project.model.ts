@@ -16,6 +16,12 @@ export type VerificationStatus =
   | 'VERIFIED_HISTORICAL'
   | 'FACULTY_APPROVED'
 
+export type RepositoryPublicationStatus =
+  | 'NOT_PUBLISHED'
+  | 'PUBLISHED'
+  | 'UNPUBLISHED'
+  | 'ARCHIVED'
+
 export interface IProjectModule {
   name: string
   description: string
@@ -107,6 +113,12 @@ export interface IProject {
   sourceType: SourceType
   reviewStatus: ReviewStatus
   verificationStatus: VerificationStatus
+  publicationStatus?: RepositoryPublicationStatus
+  sourceScheduleId?: string
+  publishedBy?: string
+  publishedAt?: Date
+  unpublishedReason?: string
+  publishedAssetFileIds?: string[]
   uploadedBy: string
   approvedBy?: string
   approvedAt?: Date
@@ -221,6 +233,16 @@ const ProjectSchema = new Schema<ProjectDocument>(
       default: 'PENDING_VERIFICATION',
       index: true,
     },
+    publicationStatus: {
+      type: String,
+      enum: ['NOT_PUBLISHED', 'PUBLISHED', 'UNPUBLISHED', 'ARCHIVED'],
+      index: true,
+    },
+    sourceScheduleId: { type: String, index: true },
+    publishedBy: { type: String },
+    publishedAt: { type: Date },
+    unpublishedReason: { type: String },
+    publishedAssetFileIds: [{ type: String }],
     uploadedBy: { type: String, required: true },
     approvedBy: { type: String },
     approvedAt: { type: Date },
@@ -360,6 +382,12 @@ export function mapProjectDoc(doc: any): IProject {
     sourceType: doc.sourceType,
     reviewStatus: doc.reviewStatus,
     verificationStatus: doc.verificationStatus,
+    publicationStatus: doc.publicationStatus,
+    sourceScheduleId: doc.sourceScheduleId,
+    publishedBy: doc.publishedBy,
+    publishedAt: doc.publishedAt,
+    unpublishedReason: doc.unpublishedReason,
+    publishedAssetFileIds: doc.publishedAssetFileIds || [],
     uploadedBy: doc.uploadedBy,
     approvedBy: doc.approvedBy,
     approvedAt: doc.approvedAt,
@@ -420,6 +448,7 @@ export const ProjectRepository = {
   async getAllAccessible(collegeId?: string): Promise<IProject[]> {
     if (isMongoConnected()) {
       const filter: any = {
+        publicationStatus: { $nin: ['NOT_PUBLISHED', 'UNPUBLISHED', 'ARCHIVED'] },
         $or: [
           { verificationStatus: 'VERIFIED_HISTORICAL' },
           { verificationStatus: 'FACULTY_APPROVED', reviewStatus: 'APPROVED' },
@@ -431,9 +460,14 @@ export const ProjectRepository = {
     }
     assertPersistenceAvailable('project repository')
     return inMemoryProjectStore.find((p) => {
+      const blocked =
+        p.publicationStatus === 'NOT_PUBLISHED' ||
+        p.publicationStatus === 'UNPUBLISHED' ||
+        p.publicationStatus === 'ARCHIVED'
       const verified =
-        p.verificationStatus === 'VERIFIED_HISTORICAL' ||
-        (p.verificationStatus === 'FACULTY_APPROVED' && p.reviewStatus === 'APPROVED')
+        !blocked &&
+        (p.verificationStatus === 'VERIFIED_HISTORICAL' ||
+          (p.verificationStatus === 'FACULTY_APPROVED' && p.reviewStatus === 'APPROVED'))
       return verified && (!collegeId || p.collegeId === collegeId)
     })
   },

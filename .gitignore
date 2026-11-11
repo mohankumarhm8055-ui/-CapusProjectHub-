@@ -29,3 +29,7 @@ node_modules/
 dist/
 **/dist/
 dist-ssr/
+
+# Private uploaded evidence storage
+storage/
+backend/storage/

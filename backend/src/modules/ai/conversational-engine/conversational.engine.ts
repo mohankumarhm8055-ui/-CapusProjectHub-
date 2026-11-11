@@ -307,6 +307,17 @@ export class ConversationalEngine {
             .join('\n')
         : '  - No contributor mentorship status recorded.'
 
+    const facultyGuideText = p.facultyGuide?.name
+      ? `${p.facultyGuide.name}${p.facultyGuide.designation ? `, ${p.facultyGuide.designation}` : ''}${
+          p.facultyGuide.department ? ` (${p.facultyGuide.department})` : ''
+        }`
+      : 'Not recorded in repository metadata'
+
+    const objectivesLines =
+      p.objectives && p.objectives.length > 0
+        ? p.objectives.map((o) => `  - ${o}`).join('\n')
+        : '  - Objectives not itemized in repository documentation'
+
     const limitationsList =
       p.limitations && p.limitations.length > 0
         ? p.limitations.map((l) => `- **Documented Limitation**: ${l}`).join('\n')
@@ -346,7 +357,10 @@ export class ConversationalEngine {
 - **Department**: ${p.department}
 - **Source & Verification**: ${readableSourceType} (${readableVerification})
 - **Problem Addressed (Documented)**: ${p.problemStatement}
+- **Documented Objectives**:
+${objectivesLines}
 - **Proposed Solution (Documented)**: ${top.analysis.documentedSolution}
+- **Faculty Guide (Documented)**: ${facultyGuideText}
 - **Technologies Used (Documented)**: ${techList}
 - **Documented Features**:
 ${featureList}

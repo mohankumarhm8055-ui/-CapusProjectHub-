@@ -18,6 +18,12 @@ const envSchema = z.object({
   GEMINI_MODEL: z.string().default('gemini-1.5-flash'),
   OPENAI_API_KEY: z.string().optional(),
   OPENAI_MODEL: z.string().default('gpt-4o-mini'),
+  SMTP_HOST: z.string().optional(),
+  SMTP_PORT: z.string().optional().transform((v) => (v ? parseInt(v, 10) : 587)),
+  SMTP_USER: z.string().optional(),
+  SMTP_PASS: z.string().optional(),
+  SMTP_FROM: z.string().optional(),
+  REMINDER_INTERVAL_MINUTES: z.string().default('15').transform((v) => Math.max(1, parseInt(v, 10) || 15)),
 })
 
 export const config = envSchema.parse(process.env)

@@ -763,20 +763,35 @@ export class ConnectionService {
 
   async getNotifications(userId: string): Promise<INotification[]> {
     if (isMongoConnected()) {
-      const docs = await MongoNotificationModel.find({ recipientId: userId }).sort({ createdAt: -1 }).lean()
-      return docs.map((d) => ({
+      const docs = await MongoNotificationModel.find({
+        recipientId: userId,
+        cleared: { $ne: true },
+      })
+        .sort({ createdAt: -1 })
+        .lean()
+      return docs.map((d: any) => ({
         id: d._id.toString(),
         recipientId: d.recipientId,
         type: d.type as any,
+        category: d.category,
         title: d.title,
         message: d.message,
+        actionUrl: d.actionUrl,
+        deduplicationKey: d.deduplicationKey,
+        deadlineVersion: d.deadlineVersion,
+        deliveryStatus: d.deliveryStatus,
+        emailDeliveryStatus: d.emailDeliveryStatus,
+        deliveryError: d.deliveryError,
+        cleared: Boolean(d.cleared),
         data: d.data as any,
         read: d.read,
-        createdAt: (d as any).createdAt,
+        createdAt: d.createdAt,
       }))
     }
     assertPersistenceAvailable('notifications')
-    return inMemoryNotificationStore.findByRecipient(userId)
+    return inMemoryNotificationStore.findByRecipient(userId).then((list) =>
+      list.filter((n) => !n.cleared)
+    )
   }
 
   async markNotificationRead(notificationId: string, userId: string): Promise<boolean> {

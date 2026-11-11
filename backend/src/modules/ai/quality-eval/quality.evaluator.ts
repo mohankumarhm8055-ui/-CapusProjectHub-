@@ -9,7 +9,6 @@ import {
   EvalPerformanceMetrics,
   RegressionComparisonReport,
   RegressionDiffItem,
-  QualityDimensionId,
   RetrievedRecordSnapshot,
   AdvisoryJudgeResult,
 } from './quality.types.js'

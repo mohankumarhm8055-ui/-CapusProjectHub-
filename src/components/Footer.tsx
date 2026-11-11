@@ -14,6 +14,7 @@ export const Footer: React.FC<FooterProps> = ({
 }) => {
   const location = useLocation()
   const navigate = useNavigate()
+  const [footerNotice, setFooterNotice] = React.useState<string | null>(null)
 
   // Helper to scroll smoothly to section or navigate to homepage section
   const handleScrollToSection = (sectionId: string) => {
@@ -27,16 +28,20 @@ export const Footer: React.FC<FooterProps> = ({
     }
   }
 
-  // Placeholder handler for legal links without creating fake legal documents
+  // Inline accessible notice instead of blocking browser alert()
   const handlePlaceholderLegal = (e: React.MouseEvent, title: string) => {
     e.preventDefault()
-    alert(`${title} will be published prior to institution deployment. CampusProjectHub follows standard FERPA/academic privacy guidelines.`)
+    setFooterNotice(
+      `${title}: CampusProjectHub follows institutional academic data privacy guidelines; full institutional policy links are configured by your department admin at deployment.`
+    )
   }
 
-  // Placeholder handler for Help & Support
+  // Inline notice for Help & Support
   const handleSupportClick = (e: React.MouseEvent) => {
     e.preventDefault()
-    alert('CampusProjectHub Student Support: Please reach out to your department coordinator or email support@campusprojecthub.org for guidance.')
+    setFooterNotice(
+      'Student & Faculty Support: Contact your department project coordinator or use the in-app AI Mentor and Senior-Junior Mentorship channels.'
+    )
   }
 
   return (
@@ -214,6 +219,22 @@ export const Footer: React.FC<FooterProps> = ({
             </ul>
           </div>
         </div>
+
+        {footerNotice && (
+          <div
+            role="status"
+            className="mt-6 p-3 rounded-xl bg-slate-900 border border-slate-700 text-xs text-slate-300 flex items-center justify-between gap-3"
+          >
+            <span>{footerNotice}</span>
+            <button
+              type="button"
+              onClick={() => setFooterNotice(null)}
+              className="text-slate-400 hover:text-white font-semibold shrink-0 cursor-pointer"
+            >
+              Dismiss
+            </button>
+          </div>
+        )}
 
         {/* Bottom Footer Bar */}
         <div className="pt-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-500">

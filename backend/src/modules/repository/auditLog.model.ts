@@ -12,6 +12,11 @@ export type AuditAction =
   | 'FACULTY_REJECTED'
   | 'CHANGES_REQUESTED'
   | 'PROJECT_DELETED'
+  | 'FINAL_COMPLETION_APPROVED'
+  | 'PUBLICATION_DRAFT_SAVED'
+  | 'PROJECT_PUBLISHED'
+  | 'PROJECT_UNPUBLISHED'
+  | 'PROJECT_ARCHIVED'
 
 export interface IAuditLog {
   id?: string
